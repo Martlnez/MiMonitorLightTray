@@ -121,9 +121,9 @@ class _DarkSlider(tk.Canvas):
 
 
 class FlyoutWindow:
-    WIDTH    = 290
-    PAD_X    = 12
-    PAD_Y    = 10
+    WIDTH    = 240
+    PAD_X    = 8
+    PAD_Y    = 6
 
     BG       = "#1f1f1f"
     TEXT     = "#ffffff"
@@ -190,7 +190,7 @@ class FlyoutWindow:
         # ── Footer ───────────────────────────────────────────────────────────
         tk.Frame(self._root, height=1, bg="#2e2e2e").pack(fill="x")
         footer = tk.Frame(self._root, bg=self.BG)
-        footer.pack(fill="x", padx=self.PAD_X, pady=(6, 8))
+        footer.pack(fill="x", padx=self.PAD_X, pady=(4, 6))
 
         self._status_var = tk.StringVar(value="调整亮度")
         tk.Label(footer, textvariable=self._status_var,
@@ -207,14 +207,14 @@ class FlyoutWindow:
                    var: tk.IntVar, from_: int, to: int,
                    unit: str, cmd: Callable) -> None:
         row = tk.Frame(parent, bg=self.BG)
-        row.pack(fill="x", pady=(0, 12))
+        row.pack(fill="x", pady=(0, 8))
 
         top = tk.Frame(row, bg=self.BG)
         top.pack(fill="x")
         tk.Label(top, text=icon, fg=self.MUTED, bg=self.BG,
-                 font=("Segoe MDL2 Assets", 14)).pack(side="left", padx=(0, 6))
+                 font=("Segoe MDL2 Assets", 12)).pack(side="left", padx=(0, 6))
         tk.Label(top, text=label, fg=self.TEXT, bg=self.BG,
-                 font=("Microsoft YaHei UI", 11),
+                 font=("Microsoft YaHei UI", 10),
                  anchor="w").pack(side="left")
 
         bot = tk.Frame(row, bg=self.BG)
@@ -222,7 +222,7 @@ class FlyoutWindow:
 
         val_var = tk.StringVar(value="--")
         tk.Label(bot, textvariable=val_var, fg=self.TEXT, bg=self.BG,
-                 font=("Segoe UI Variable Display", 16, "bold"),
+                 font=("Segoe UI Variable Display", 14, "bold"),
                  width=5, anchor="e").pack(side="right")
 
         slider = _DarkSlider(bot, from_=from_, to=to,
@@ -309,7 +309,7 @@ class FlyoutWindow:
             self._suppress = False
 
         if state.reachable:
-            self._status_var.set("已连接" if state.is_on else "待机")
+            self._status_var.set("已开灯" if state.is_on else "已关灯")
         else:
             self._status_var.set(f"离线 — {(state.error or '')[:40]}")
 
@@ -338,7 +338,7 @@ class FlyoutWindow:
         new = self._light.toggle()
         st  = self._light.state
         self._root.after(0, lambda: self._status_var.set(
-            "已连接" if new else "待机"
+            "已开灯" if new else "已关灯"
             if st.reachable else f"离线 — {(st.error or '')[:40]}"))
 
     def _open_settings(self) -> None:
