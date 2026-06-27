@@ -299,8 +299,11 @@ class FlyoutWindow:
 
     def _position(self, ax: int, ay: int) -> None:
         self._root.update_idletasks()
-        w = self._root.winfo_reqwidth()  or self.WIDTH
+        w = self.WIDTH   # force fixed width, ignore content's natural width
         h = self._root.winfo_reqheight()
+        self._root.geometry(f"{w}x{h}")  # set width first so content reflows
+        self._root.update_idletasks()
+        h = self._root.winfo_reqheight()  # re-measure after reflow
         sw = self._root.winfo_screenwidth()
         sh = self._root.winfo_screenheight()
         x  = max(8, min(sw - w - 8, ax - w // 2))
