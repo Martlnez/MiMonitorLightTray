@@ -149,7 +149,7 @@ class FlyoutWindow:
         on_change: Callable[[str], None],
     ) -> None:
         row = tk.Frame(self._frame, bg=self.ROW_BG)
-        row.pack(fill="x", pady=(0, 8))
+        row.pack(fill="x", pady=(0, 12))
 
         # Top line: icon + name
         top = tk.Frame(row, bg=self.ROW_BG)
@@ -157,19 +157,19 @@ class FlyoutWindow:
 
         icon_lbl = tk.Label(top, text=icon,
                             fg=self.MUTED, bg=self.ROW_BG,
-                            font=("Segoe MDL2 Assets", 11))
-        icon_lbl.pack(side="left")
+                            font=("Segoe MDL2 Assets", 14))
+        icon_lbl.pack(side="left", padx=(0, 6))
 
         name_lbl_text = name_var or tk.StringVar(value=name_text)
         tk.Label(top, textvariable=name_lbl_text,
                  fg=self.TEXT, bg=self.ROW_BG,
-                 font=("Segoe UI Variable Text", 10),
-                 anchor="w", padx=6,
+                 font=("Microsoft YaHei UI", 11),
+                 anchor="w",
                  ).pack(side="left", fill="x", expand=True)
 
         # Bottom line: slider + value
         bot = tk.Frame(row, bg=self.ROW_BG)
-        bot.pack(fill="x", pady=(2, 0))
+        bot.pack(fill="x", pady=(4, 0))
 
         slider = ttk.Scale(
             bot, from_=from_, to=to_,
@@ -178,12 +178,12 @@ class FlyoutWindow:
             style="TT.Horizontal.TScale",
             cursor="hand2",
         )
-        slider.pack(side="left", fill="x", expand=True)
+        slider.pack(side="left", fill="x", expand=True, padx=(0, 12))
 
         val_var = tk.StringVar(value="--")
         tk.Label(bot, textvariable=val_var,
                  fg=self.TEXT, bg=self.ROW_BG,
-                 font=("Segoe UI Variable Display", 13, "bold"),
+                 font=("Segoe UI Variable Display", 16, "bold"),
                  width=5, anchor="e",
                  ).pack(side="right")
 

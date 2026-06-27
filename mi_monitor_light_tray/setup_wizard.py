@@ -45,38 +45,55 @@ class SetupWizard:
             self._root = tk.Toplevel(parent)
 
         self._root.title("小米显示器挂灯 — 设置")
-        self._root.geometry("480x420")
+        self._root.geometry("520x480")
         self._root.resizable(False, False)
+        self._root.configure(bg="#f0f0f0")
+
+        # Apply modern styling
+        style = ttk.Style()
+        style.theme_use('vista' if 'vista' in style.theme_names() else 'clam')
+        style.configure('TLabel', background='#f0f0f0', font=('Microsoft YaHei UI', 9))
+        style.configure('TEntry', padding=6)
+        style.configure('TButton', padding=(12, 6))
 
         self._build_ui()
 
     def _build_ui(self) -> None:
-        pad = {"padx": 12, "pady": 6}
+        pad = {"padx": 16, "pady": 10}
 
-        frm = ttk.Frame(self._root, padding=12)
+        frm = ttk.Frame(self._root, padding=20)
         frm.pack(fill="both", expand=True)
+        frm.configure(style='TFrame')
+
+        # Title
+        title_lbl = ttk.Label(frm, text="设备配置",
+                              font=("Microsoft YaHei UI", 12, "bold"))
+        title_lbl.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 16))
 
         # IP 输入框
-        ttk.Label(frm, text="设备 IP 地址").grid(row=0, column=0, sticky="w", **pad)
+        ttk.Label(frm, text="设备 IP 地址", font=("Microsoft YaHei UI", 9)).grid(
+            row=1, column=0, sticky="w", **pad)
         self._ip_var = tk.StringVar(value=self._config.device.ip)
-        ip_entry = ttk.Entry(frm, textvariable=self._ip_var, width=32)
-        ip_entry.grid(row=0, column=1, sticky="ew", **pad)
+        ip_entry = ttk.Entry(frm, textvariable=self._ip_var, width=28, font=("Consolas", 10))
+        ip_entry.grid(row=1, column=1, sticky="ew", **pad)
 
         # IP 提示标签
-        ip_hint = ttk.Label(frm, text="从米家 App 或路由器查看，如 192.168.1.100",
-                            foreground="#666666", font=("Segoe UI", 8))
-        ip_hint.grid(row=0, column=2, sticky="w", padx=(4,0))
+        ip_hint = ttk.Label(frm, text="如: 192.168.1.100",
+                            foreground="#666666", font=("Microsoft YaHei UI", 8))
+        ip_hint.grid(row=2, column=1, sticky="w", padx=16, pady=(0, 8))
 
         # Token 输入框
-        ttk.Label(frm, text="miio Token").grid(row=1, column=0, sticky="w", **pad)
+        ttk.Label(frm, text="miio Token", font=("Microsoft YaHei UI", 9)).grid(
+            row=3, column=0, sticky="w", **pad)
         self._token_var = tk.StringVar(value=self._config.device.token)
-        token_entry = ttk.Entry(frm, textvariable=self._token_var, width=32, show="*")
-        token_entry.grid(row=1, column=1, sticky="ew", **pad)
+        token_entry = ttk.Entry(frm, textvariable=self._token_var, width=28,
+                                show="*", font=("Consolas", 9))
+        token_entry.grid(row=3, column=1, sticky="ew", **pad)
 
         # Token 提示标签
         token_hint = ttk.Label(frm, text="32 位十六进制字符串",
-                               foreground="#666666", font=("Segoe UI", 8))
-        token_hint.grid(row=1, column=2, sticky="w", padx=(4,0))
+                               foreground="#666666", font=("Microsoft YaHei UI", 8))
+        token_hint.grid(row=4, column=1, sticky="w", padx=16, pady=(0, 8))
 
         self._show_token = tk.BooleanVar(value=False)
 
@@ -88,57 +105,72 @@ class SetupWizard:
             text="显示 Token",
             variable=self._show_token,
             command=_toggle_show,
-        ).grid(row=2, column=1, sticky="w", padx=12)
+        ).grid(row=5, column=1, sticky="w", padx=16, pady=(0, 10))
 
         # 设备名称
-        ttk.Label(frm, text="显示名称").grid(row=3, column=0, sticky="w", **pad)
+        ttk.Label(frm, text="显示名称", font=("Microsoft YaHei UI", 9)).grid(
+            row=6, column=0, sticky="w", **pad)
         self._name_var = tk.StringVar(value=self._config.device.name or "显示器挂灯")
-        name_entry = ttk.Entry(frm, textvariable=self._name_var, width=32)
-        name_entry.grid(row=3, column=1, sticky="ew", **pad)
+        name_entry = ttk.Entry(frm, textvariable=self._name_var, width=28,
+                               font=("Microsoft YaHei UI", 10))
+        name_entry.grid(row=6, column=1, sticky="ew", **pad)
 
         name_hint = ttk.Label(frm, text="托盘显示的设备名称",
-                              foreground="#666666", font=("Segoe UI", 8))
-        name_hint.grid(row=3, column=2, sticky="w", padx=(4,0))
+                              foreground="#666666", font=("Microsoft YaHei UI", 8))
+        name_hint.grid(row=7, column=1, sticky="w", padx=16, pady=(0, 8))
 
         # 型号（可选）
-        ttk.Label(frm, text="型号（可选）").grid(row=4, column=0, sticky="w", **pad)
+        ttk.Label(frm, text="型号（可选）", font=("Microsoft YaHei UI", 9)).grid(
+            row=8, column=0, sticky="w", **pad)
         self._model_var = tk.StringVar(value=self._config.device.model)
-        ttk.Entry(frm, textvariable=self._model_var, width=32).grid(row=4, column=1, sticky="ew", **pad)
+        ttk.Entry(frm, textvariable=self._model_var, width=28,
+                  font=("Consolas", 9)).grid(row=8, column=1, sticky="ew", **pad)
 
         model_hint = ttk.Label(frm, text="留空自动识别",
-                               foreground="#666666", font=("Segoe UI", 8))
-        model_hint.grid(row=4, column=2, sticky="w", padx=(4,0))
+                               foreground="#666666", font=("Microsoft YaHei UI", 8))
+        model_hint.grid(row=9, column=1, sticky="w", padx=16, pady=(0, 12))
 
         frm.columnconfigure(1, weight=1)
 
+        # 分隔线
+        sep = ttk.Separator(frm, orient="horizontal")
+        sep.grid(row=10, column=0, columnspan=2, sticky="ew", pady=(12, 8))
+
         # 帮助文本框
+        help_label = ttk.Label(frm, text="如何获取参数？",
+                               font=("Microsoft YaHei UI", 9, "bold"))
+        help_label.grid(row=11, column=0, columnspan=2, sticky="w", padx=16, pady=(8, 4))
+
         help_box = tk.Text(
             frm,
-            height=8,
+            height=7,
             wrap="word",
-            background="#f7f7f7",
-            relief="flat",
+            background="#f9f9f9",
+            relief="solid",
+            borderwidth=1,
             font=("Microsoft YaHei UI", 9),
+            padx=8,
+            pady=8,
         )
         help_box.insert("1.0", _HELP_TEXT)
         help_box.configure(state="disabled")
-        help_box.grid(row=5, column=0, columnspan=2, sticky="ew", padx=12, pady=(8, 4))
+        help_box.grid(row=12, column=0, columnspan=2, sticky="ew", padx=16, pady=(4, 12))
 
+        # 状态标签
         self._status_var = tk.StringVar(value="")
-        ttk.Label(frm, textvariable=self._status_var, foreground="#555").grid(
-            row=6, column=0, columnspan=2, sticky="w", padx=12
-        )
+        status_lbl = ttk.Label(frm, textvariable=self._status_var,
+                               foreground="#0066cc", font=("Microsoft YaHei UI", 9))
+        status_lbl.grid(row=13, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 8))
 
+        # 按钮行
         btn_row = ttk.Frame(frm)
-        btn_row.grid(row=7, column=0, columnspan=2, sticky="e", pady=(8, 0))
-
-        self._test_btn = ttk.Button(btn_row, text="测试连接", command=self._on_test)
-        self._test_btn.pack(side="left", padx=4)
-
-        self._save_btn = ttk.Button(btn_row, text="保存", command=self._on_save)
-        self._save_btn.pack(side="left", padx=4)
+        btn_row.grid(row=14, column=0, columnspan=2, sticky="e", pady=(12, 0), padx=16)
 
         ttk.Button(btn_row, text="取消", command=self._close).pack(side="left", padx=4)
+        self._test_btn = ttk.Button(btn_row, text="测试连接", command=self._on_test)
+        self._test_btn.pack(side="left", padx=4)
+        self._save_btn = ttk.Button(btn_row, text="保存", command=self._on_save, style='Accent.TButton')
+        self._save_btn.pack(side="left", padx=4)
 
     # ---------- actions ----------
 
