@@ -16,6 +16,26 @@ log = logging.getLogger(__name__)
 StateListener = Callable[["LightState"], None]
 
 
+def _extract_device_id(device: Yeelight) -> int:
+    """Read the miio header device_id captured during the last handshake.
+
+    python-miio's ``DeviceInfo`` on Yeelight monitor lights does not expose a
+    ``device_id`` attribute, but the protocol stashes the 4-byte device ID from
+    the response header on ``_protocol._device_id``. That matches what the UDP
+    broadcast discovery parser extracts, so it's the right value for IP
+    rediscovery to match against. Returns 0 if the protocol hasn't seen a
+    response yet or the layout changes in a future python-miio version.
+    """
+    proto = getattr(device, "_protocol", None)
+    raw = getattr(proto, "_device_id", b"") if proto is not None else b""
+    if not raw or len(raw) != 4:
+        return 0
+    try:
+        return int.from_bytes(raw, "big")
+    except (TypeError, ValueError):
+        return 0
+
+
 @dataclass
 class LightState:
     is_on: bool = False
@@ -134,9 +154,13 @@ class MiMonitorLight:
         # Capture device_id on first successful connection if not already known.
         if self._device_id == 0:
             try:
-                info = self._device.info()
-                self._device_id = info.device_id
-                log.info("Captured device ID: %08x", self._device_id)
+                # Force a handshake if one hasn't happened, then read the
+                # protocol-level device_id (DeviceInfo doesn't expose it on
+                # Yeelight monitor lights).
+                self._device.info()
+                self._device_id = _extract_device_id(self._device)
+                if self._device_id:
+                    log.info("Captured device ID: %08x", self._device_id)
             except Exception:  # noqa: BLE001
                 pass
 
@@ -246,14 +270,20 @@ class Debouncer:
             self._pending = None
 
 
-def quick_ping(ip: str, token: str, timeout: float = 3.0) -> tuple[bool, str]:
-    """Return (ok, message) for a minimal connectivity check used by the setup wizard."""
+def quick_ping(ip: str, token: str, timeout: float = 3.0) -> tuple[bool, str, int]:
+    """Return (ok, message, device_id) for a minimal connectivity check.
+
+    Used by the setup wizard. device_id is 0 on failure or when the protocol
+    layout changes; non-zero values should be persisted to config so
+    auto-discovery can work later if the IP changes.
+    """
     try:
         dev = Yeelight(ip=ip, token=token)
         dev.timeout = timeout
         info = dev.info()
-        return True, f"Connected: {info.model} (firmware {info.firmware_version})"
+        device_id = _extract_device_id(dev)
+        return True, f"Connected: {info.model} (firmware {info.firmware_version})", device_id
     except DeviceException as exc:
-        return False, f"miio error: {exc}"
+        return False, f"miio error: {exc}", 0
     except Exception as exc:  # noqa: BLE001 - surface anything else to the user
-        return False, f"{type(exc).__name__}: {exc}"
+        return False, f"{type(exc).__name__}: {exc}", 0

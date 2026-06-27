@@ -65,6 +65,7 @@ class SetupWizard:
         self._config = config
         self._on_saved = on_saved
         self._owns_root = parent is None
+        self._tested_device_id = 0
 
         self._root = tk.Tk() if parent is None else tk.Toplevel(parent)
         self._root.title("小米显示器挂灯 — 设置")
@@ -220,11 +221,14 @@ class SetupWizard:
     # ── actions ────────────────────────────────────────────────────────────────
 
     def _collect(self) -> DeviceConfig:
+        # Preserve device_id captured by a prior successful connection or test —
+        # never wipe it here, or auto-rediscovery on IP change stops working.
         return DeviceConfig(
             ip=self._ip_var.get().strip(),
             token=self._token_var.get().strip(),
             name=self._name_var.get().strip() or "显示器挂灯",
             model=self._model_var.get().strip(),
+            device_id=self._tested_device_id or self._config.device.device_id,
         )
 
     def _on_test(self) -> None:
@@ -240,13 +244,16 @@ class SetupWizard:
                          args=(dev,), daemon=True).start()
 
     def _test_thread(self, dev: DeviceConfig) -> None:
-        ok, message = quick_ping(dev.ip, dev.token)
-        self._root.after(0, lambda: self._after_test(ok, message))
+        ok, message, device_id = quick_ping(dev.ip, dev.token)
+        self._root.after(0, lambda: self._after_test(ok, message, device_id))
 
-    def _after_test(self, ok: bool, message: str) -> None:
+    def _after_test(self, ok: bool, message: str, device_id: int) -> None:
         self._test_btn.configure(state="normal")
         self._status_var.set(message)
         if ok:
+            if device_id:
+                self._tested_device_id = device_id
+                log.info("Test connection captured device_id %08x", device_id)
             messagebox.showinfo("连接成功", f"设备在线\n{message}",
                                 parent=self._root)
         else:
