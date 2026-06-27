@@ -130,9 +130,9 @@ class _DarkSlider(tk.Canvas):
 
 
 class FlyoutWindow:
-    WIDTH    = 240
-    PAD_X    = 8
-    PAD_Y    = 6
+    WIDTH    = 360
+    PAD_X    = 12
+    PAD_Y    = 10
 
     BG       = "#1f1f1f"
     TEXT     = "#ffffff"
@@ -307,7 +307,7 @@ class FlyoutWindow:
         sw = self._root.winfo_screenwidth()
         sh = self._root.winfo_screenheight()
         x  = max(8, min(sw - w - 8, ax - w // 2))
-        y  = max(8, min(sh - h - 8, ay - h - 12))
+        y  = max(8, min(sh - h - 8, ay - h  - 35))
         self._root.geometry(f"{w}x{h}+{x}+{y}")
 
     def _apply_state(self, state: LightState) -> None:

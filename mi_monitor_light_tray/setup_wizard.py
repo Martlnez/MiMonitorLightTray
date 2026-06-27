@@ -16,9 +16,9 @@ log = logging.getLogger(__name__)
 _HELP_TEXT = (
     "如何获取 miio Token：\n\n"
     "1. 从以下地址下载 token_extractor.exe 并运行：\n"
-    "   github.com/PiotrMachowski/\n"
+    "   https://github.com/PiotrMachowski/\n"
     "   Xiaomi-cloud-tokens-extractor/releases\n\n"
-    "2. 输入小米账号和密码，工具会列出所有\n"
+    "2. 输入根据提示授权登录，工具会列出所有\n"
     "   设备的 IP 和 32 位 Token\n\n"
     "3. 找到显示器挂灯，复制 IP 和 Token\n\n"
     "IP 也可从米家 App → 设备详情 → ⋮\n"
