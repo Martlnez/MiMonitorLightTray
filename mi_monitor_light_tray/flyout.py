@@ -80,13 +80,16 @@ class FlyoutWindow:
         style.configure("TT.Horizontal.TScale",
                          background=self.BG,
                          troughcolor=self.TRACK,
-                         sliderlength=16,
+                         sliderlength=18,
                          borderwidth=0,
-                         lightcolor=self.ACCENT,
-                         darkcolor=self.ACCENT)
+                         lightcolor=self.TRACK,
+                         darkcolor=self.TRACK,
+                         relief="flat")
         style.map("TT.Horizontal.TScale",
                   background=[("active", self.BG)],
-                  troughcolor=[("active", self.TRACK)])
+                  troughcolor=[("active", self.TRACK)],
+                  lightcolor=[("active", self.TRACK)],
+                  darkcolor=[("active", self.TRACK)])
 
         # ── Device rows ──────────────────────────────────────────────────────
         self._brightness_var  = tk.IntVar(value=50)
@@ -95,7 +98,7 @@ class FlyoutWindow:
         self._build_device_row(
             icon      = "",          # Segoe MDL2: monitor
             name_var  = None,
-            name_text = "显示器挂灯",
+            name_text = "亮度",
             slider_var= self._brightness_var,
             from_     = MiMonitorLight.BRIGHTNESS_MIN,
             to_       = MiMonitorLight.BRIGHTNESS_MAX,
@@ -127,14 +130,11 @@ class FlyoutWindow:
                  font=("Segoe UI", 9), anchor="w"
                  ).pack(side="left")
 
-        # Icon buttons on the right (Segoe MDL2 Assets glyphs)
-        # 从右到左：设置 > 链接 > 电源
+        # 从右到左：设置 > 电源
         icons = [
-            ("", self._open_settings,    "设置"),       # E713: Settings
-            ("", lambda: None,           "链接设备"),    # E710: Link (for future multi-device)
-            ("", self._on_toggle_power,  "电源开关"),    # E7E8: Power button
+            ("", self._open_settings,   "设置"),
+            ("", self._on_toggle_power, "电源开关"),
         ]
-        for glyph, cmd, tip in reversed(icons):
             self._icon_btn(footer, glyph, cmd)
 
     def _build_device_row(
