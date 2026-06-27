@@ -1,4 +1,9 @@
-"""Persistent user configuration stored under %APPDATA%/MiMonitorLightTray/config.json."""
+"""Persistent user configuration stored under %APPDATA%/MiMonitorLightTray/config.json.
+
+Only data the program actually consumes lives here. Brightness/color-temp are
+remembered by the lamp itself; launch-at-startup is owned by the Windows
+registry (see ``autostart.py``).
+"""
 
 from __future__ import annotations
 
@@ -34,9 +39,6 @@ class DeviceConfig:
 @dataclass
 class AppConfig:
     device: DeviceConfig = field(default_factory=DeviceConfig)
-    last_brightness: int = 50
-    last_color_temp: int = 4000
-    start_with_windows: bool = False
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "AppConfig":
@@ -48,23 +50,16 @@ class AppConfig:
         except (OSError, json.JSONDecodeError) as exc:
             log.warning("Failed to read config %s: %s", path, exc)
             return cls()
-        dev = DeviceConfig(**data.get("device", {}))
-        return cls(
-            device=dev,
-            last_brightness=int(data.get("last_brightness", 50)),
-            last_color_temp=int(data.get("last_color_temp", 4000)),
-            start_with_windows=bool(data.get("start_with_windows", False)),
-        )
+        dev_data = data.get("device", {})
+        # Tolerate legacy keys silently — DeviceConfig(**unknown) would raise.
+        known = {f for f in DeviceConfig.__dataclass_fields__}
+        dev = DeviceConfig(**{k: v for k, v in dev_data.items() if k in known})
+        return cls(device=dev)
 
     def save(self, path: Optional[Path] = None) -> None:
         path = path or default_config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "device": asdict(self.device),
-            "last_brightness": self.last_brightness,
-            "last_color_temp": self.last_color_temp,
-            "start_with_windows": self.start_with_windows,
-        }
+        payload = {"device": asdict(self.device)}
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         os.replace(tmp, path)

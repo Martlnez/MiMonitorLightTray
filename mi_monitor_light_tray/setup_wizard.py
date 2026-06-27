@@ -10,6 +10,7 @@ from typing import Callable, Optional
 
 from .config import AppConfig, DeviceConfig
 from .miio_client import quick_ping
+from . import autostart
 
 log = logging.getLogger(__name__)
 
@@ -21,8 +22,8 @@ _HELP_TEXT = (
     "2. 输入根据提示授权登录，工具会列出所有\n"
     "   设备的 IP 和 32 位 Token\n\n"
     "3. 找到显示器挂灯，复制 IP 和 Token\n\n"
-    "IP 也可从米家 App → 设备详情 → ⋮\n"
-    "→ 设备信息 中查看"
+    "IP 也可从米家 App → 设备页面右上角三个点 → ⋮\n"
+    "→ 更多设置 网络信息 中查看"
 )
 
 
@@ -163,6 +164,23 @@ class SetupWizard:
         ttk.Checkbutton(frm, text="显示 Token",
                         variable=self._show_token, command=_toggle
                         ).grid(row=5, column=1, sticky="w", padx=16)
+
+        # Launch-at-startup toggle. Reads/writes the user-scope Run registry key
+        # via autostart.py; state is independent of config.json.
+        self._autostart_var = tk.BooleanVar(value=autostart.is_enabled())
+
+        def _toggle_autostart():
+            target = self._autostart_var.get()
+            ok = autostart.enable() if target else autostart.disable()
+            actual = autostart.is_enabled()
+            if actual != target or not ok:
+                # Restore checkbox to what actually happened so UI doesn't lie.
+                self._autostart_var.set(actual)
+
+        ttk.Checkbutton(frm, text="开机自启动",
+                        variable=self._autostart_var,
+                        command=_toggle_autostart
+                        ).grid(row=5, column=0, sticky="w", padx=16)
 
         frm.columnconfigure(1, weight=1)
 

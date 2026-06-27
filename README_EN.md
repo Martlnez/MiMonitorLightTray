@@ -57,7 +57,7 @@ You need two pieces of information to talk to the light: the **device's LAN IP**
 **Option A — Mi Home app**
 
 1. Open Mi Home, locate the monitor light
-2. Open the device page → **⋮** (top-right) → **Device info**
+2. Open the device page → **⋮** (top-right) → **More settings** → **Network info**
 3. Note the IP (e.g. `192.168.1.100`)
 
 **Option B — your router**
@@ -118,7 +118,7 @@ print(f"Color temp: {status.color_temp}K")
 
 ### Run at startup
 
-Press `Win+R`, run `shell:startup`, drop a shortcut to `MiMonitorLightTray.exe` into the folder that opens.
+Open **设置** (Settings) and tick "开机自启动" (Run at startup), or use the same item in the tray right-click menu. This writes a `MiMonitorLightTray` entry to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` — current-user only, no admin required.
 
 ### Command-line flags
 
@@ -176,14 +176,11 @@ Location: `%APPDATA%\MiMonitorLightTray\config.json`
     "name": "Mi Monitor Light",
     "model": "",
     "device_id": 12345678
-  },
-  "last_brightness": 50,
-  "last_color_temp": 4000,
-  "start_with_windows": false
+  }
 }
 ```
 
-`device_id` is captured automatically on the first successful connect and is what enables auto-rediscovery when the IP changes.
+`device_id` is captured automatically on the first successful connect and is what enables auto-rediscovery when the IP changes. Brightness and color temperature are remembered by the lamp itself; the launch-at-startup flag lives in the Windows registry, not here.
 
 ## Troubleshooting
 

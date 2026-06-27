@@ -57,7 +57,7 @@ mi-monitor-light-tray
 **方法 A：通过米家 App**
 
 1. 打开米家 App，找到显示器挂灯
-2. 进入设备详情 → 右上角 **⋮** → **设备信息**
+2. 进入设备页面 → 右上角三个点 **⋮** → **更多设置** → **网络信息**
 3. 记下 IP 地址（形如 `192.168.1.100`）
 
 **方法 B：通过路由器**
@@ -116,7 +116,7 @@ print(f"色温: {status.color_temp}K")
 
 ### 开机自启动
 
-按 `Win+R` 输入 `shell:startup` 回车，把 `MiMonitorLightTray.exe` 的快捷方式放进去即可。
+打开 **设置** 窗口勾选"开机自启动"，或者在托盘**右键菜单**点击"开机自启动"切换。本质是向 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 写一条 `MiMonitorLightTray`，不需要管理员权限，只对当前用户生效。
 
 ### 命令行参数
 
@@ -174,14 +174,11 @@ tests/                 pytest 单元测试套件
     "name": "显示器挂灯",
     "model": "",
     "device_id": 12345678
-  },
-  "last_brightness": 50,
-  "last_color_temp": 4000,
-  "start_with_windows": false
+  }
 }
 ```
 
-`device_id` 在首次连接成功时自动捕获，用于 IP 变化后的自动发现。
+`device_id` 在首次连接成功时自动捕获，用于 IP 变化后的自动发现。亮度/色温由挂灯自己记忆；开机自启动状态由 Windows 注册表保存，不在此文件里。
 
 ## 常见问题
 

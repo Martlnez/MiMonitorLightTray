@@ -10,6 +10,7 @@ from typing import Callable
 import pystray
 from pystray import Menu, MenuItem
 
+from . import autostart
 from .icon import make_tray_icon
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,11 @@ class TrayController:
                 MenuItem("Open", self._handle_open, default=True, visible=False),
                 MenuItem("调整亮度", self._handle_open),
                 MenuItem("设置", self._handle_settings),
+                MenuItem(
+                    "开机自启动",
+                    self._handle_toggle_autostart,
+                    checked=lambda _i: autostart.is_enabled(),
+                ),
                 Menu.SEPARATOR,
                 MenuItem("退出", self._handle_exit),
             ),
@@ -87,6 +93,15 @@ class TrayController:
 
     def _handle_settings(self, _icon, _item) -> None:
         self._on_open_settings()
+
+    def _handle_toggle_autostart(self, icon, _item) -> None:
+        new_state = autostart.toggle()
+        log.info("Autostart toggled to %s", new_state)
+        # Force the menu to redraw so the checkmark reflects the new state.
+        try:
+            icon.update_menu()
+        except Exception:  # noqa: BLE001
+            log.debug("update_menu failed", exc_info=True)
 
     def _handle_exit(self, _icon, _item) -> None:
         self._on_exit()
