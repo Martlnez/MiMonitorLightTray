@@ -158,7 +158,8 @@ class FlyoutWindow:
     def _apply_rounded_corners(self) -> None:
         try:
             import ctypes
-            hwnd = self._root.winfo_id()
+            # winfo_id() gives the embedded frame; GetAncestor(GA_ROOT=2) gets the true top-level HWND
+            hwnd = ctypes.windll.user32.GetAncestor(self._root.winfo_id(), 2)
             val  = ctypes.c_int(2)   # DWMWCP_ROUND
             ctypes.windll.dwmapi.DwmSetWindowAttribute(
                 hwnd, 33, ctypes.byref(val), 4)
@@ -197,8 +198,8 @@ class FlyoutWindow:
                  font=("Segoe UI", 9)).pack(side="left")
 
         for glyph, cmd in reversed([
-            ("", self._open_settings),
-            ("", self._on_toggle_power),
+            ("⚙", self._open_settings),
+            ("⏻", self._on_toggle_power),
         ]):
             self._icon_btn(footer, glyph, cmd)
 
@@ -240,7 +241,7 @@ class FlyoutWindow:
 
     def _icon_btn(self, parent, glyph: str, cmd: Callable) -> None:
         btn = tk.Label(parent, text=glyph, fg=self.MUTED, bg=self.BG,
-                       font=("Segoe MDL2 Assets", 13),
+                       font=("Segoe UI Symbol", 14),
                        padx=6, cursor="hand2")
         btn.pack(side="right")
         btn.bind("<Button-1>", lambda _: cmd())
