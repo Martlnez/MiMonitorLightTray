@@ -1,0 +1,96 @@
+"""System-tray icon glue between pystray (worker thread) and the Tk flyout."""
+
+from __future__ import annotations
+
+import ctypes
+import logging
+import threading
+from typing import Callable
+
+import pystray
+from pystray import Menu, MenuItem
+
+from .icon import make_tray_icon
+
+log = logging.getLogger(__name__)
+
+
+def _cursor_pos() -> tuple[int, int]:
+    """Return the current cursor position (x, y).
+
+    pystray does not expose the icon's pixel location; the cursor is on or
+    next to the icon when the user clicks it, which is good enough to anchor
+    the flyout near the tray.
+    """
+    try:
+        class _POINT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+        pt = _POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+        return int(pt.x), int(pt.y)
+    except (OSError, AttributeError):
+        return 0, 0
+
+
+class TrayController:
+    def __init__(
+        self,
+        *,
+        title: str,
+        on_left_click: Callable[[int, int], None],
+        on_open_settings: Callable[[], None],
+        on_exit: Callable[[], None],
+    ) -> None:
+        self._on_left_click = on_left_click
+        self._on_open_settings = on_open_settings
+        self._on_exit = on_exit
+
+        self._icon = pystray.Icon(
+            "mi-monitor-light-tray",
+            icon=make_tray_icon(64, on=True),
+            title=title,
+            menu=Menu(
+                MenuItem("Open", self._handle_open, default=True, visible=False),
+                MenuItem("Adjust…", self._handle_open),
+                MenuItem("Settings", self._handle_settings),
+                Menu.SEPARATOR,
+                MenuItem("Exit", self._handle_exit),
+            ),
+        )
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._icon.run, name="tray", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        try:
+            self._icon.stop()
+        except Exception:  # noqa: BLE001
+            log.debug("Tray icon stop failed", exc_info=True)
+
+    def set_title(self, title: str) -> None:
+        self._icon.title = title
+
+    def set_state(self, on: bool) -> None:
+        try:
+            self._icon.icon = make_tray_icon(64, on=on)
+        except Exception:  # noqa: BLE001
+            log.debug("Tray icon update failed", exc_info=True)
+
+    # ---------- pystray callbacks (run on tray thread) ----------
+
+    def _handle_open(self, _icon, _item) -> None:
+        x, y = _cursor_pos()
+        self._on_left_click(x, y)
+
+    def _handle_settings(self, _icon, _item) -> None:
+        self._on_open_settings()
+
+    def _handle_exit(self, _icon, _item) -> None:
+        self._on_exit()
+        try:
+            self._icon.stop()
+        except Exception:  # noqa: BLE001
+            log.debug("Tray icon stop failed", exc_info=True)

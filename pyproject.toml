@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mi-monitor-light-tray"
+version = "0.1.0"
+description = "Twinkle Tray-style Windows tray app for adjusting Xiaomi/Mi monitor light bar brightness and color temperature via python-miio."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Martlnez" }]
+keywords = ["xiaomi", "mijia", "yeelight", "monitor-light", "tray", "miio", "windows"]
+classifiers = [
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Home Automation",
+]
+dependencies = [
+    "python-miio>=0.5.12",
+    "pystray>=0.19.5",
+    "Pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+dev = ["pytest>=7.0"]
+
+[project.urls]
+Homepage = "https://github.com/Martlnez/MiMonitorLightTray"
+Issues = "https://github.com/Martlnez/MiMonitorLightTray/issues"
+
+[project.scripts]
+mi-monitor-light-tray = "mi_monitor_light_tray.__main__:main"
+
+[project.gui-scripts]
+mi-monitor-light-tray-gui = "mi_monitor_light_tray.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["mi_monitor_light_tray*"]
