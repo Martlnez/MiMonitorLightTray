@@ -6,12 +6,14 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 from miio import Yeelight
 from miio.exceptions import DeviceException
 
 log = logging.getLogger(__name__)
+
+StateListener = Callable[["LightState"], None]
 
 
 @dataclass
@@ -28,7 +30,9 @@ class MiMonitorLight:
 
     The underlying ``miio`` calls are not reentrant on a single device handle,
     so a lock serialises access. State is cached so the UI can render without
-    waiting on the network for every paint.
+    waiting on the network for every paint. Errors are captured into
+    ``state.error`` rather than raised so callers don't need a try/except at
+    every site.
     """
 
     BRIGHTNESS_MIN = 1
@@ -40,17 +44,40 @@ class MiMonitorLight:
 
     def __init__(self, ip: str, token: str, model: str = "") -> None:
         self._lock = threading.Lock()
-        # Pass a model explicitly so python-miio does not block the constructor
-        # with a network probe when the device is offline at startup.
         self._device = Yeelight(ip=ip, token=token, model=model or self.DEFAULT_MODEL)
         self._state = LightState()
+        self._listener: Optional[StateListener] = None
+        self._last_error_log = 0.0
 
     @property
     def state(self) -> LightState:
         return self._state
 
+    def set_listener(self, listener: Optional[StateListener]) -> None:
+        self._listener = listener
+
+    def _notify(self) -> None:
+        listener = self._listener
+        if listener is None:
+            return
+        try:
+            listener(self._state)
+        except Exception:  # noqa: BLE001
+            log.exception("State listener raised")
+
+    def _record_error(self, exc: Exception, action: str) -> None:
+        now = time.monotonic()
+        if now - self._last_error_log > 5.0:
+            log.warning("Device %s failed: %s", action, exc)
+            self._last_error_log = now
+        self._state.reachable = False
+        self._state.error = str(exc)
+
+    def _record_success(self) -> None:
+        self._state.reachable = True
+        self._state.error = None
+
     def refresh(self) -> LightState:
-        """Pull current status from the device."""
         with self._lock:
             try:
                 status = self._device.status()
@@ -62,45 +89,58 @@ class MiMonitorLight:
                     error=None,
                 )
             except DeviceException as exc:
-                log.warning("Device unreachable: %s", exc)
-                self._state = LightState(reachable=False, error=str(exc))
+                self._record_error(exc, "status")
+        self._notify()
         return self._state
 
     def set_power(self, on: bool) -> None:
         with self._lock:
-            if on:
-                self._device.on()
-            else:
-                self._device.off()
-            self._state.is_on = on
-            self._state.reachable = True
-            self._state.error = None
+            try:
+                if on:
+                    self._device.on()
+                else:
+                    self._device.off()
+                self._state.is_on = on
+                self._record_success()
+            except DeviceException as exc:
+                self._record_error(exc, "power")
+        self._notify()
 
     def toggle(self) -> bool:
         with self._lock:
-            self._device.toggle()
-        new_state = not self._state.is_on
-        self._state.is_on = new_state
-        return new_state
+            try:
+                self._device.toggle()
+                self._state.is_on = not self._state.is_on
+                self._record_success()
+            except DeviceException as exc:
+                self._record_error(exc, "toggle")
+        self._notify()
+        return self._state.is_on
 
     def set_brightness(self, value: int) -> int:
         value = max(self.BRIGHTNESS_MIN, min(self.BRIGHTNESS_MAX, int(value)))
         with self._lock:
-            self._device.set_brightness(value)
-            self._state.brightness = value
-            self._state.is_on = True
-            self._state.reachable = True
-            self._state.error = None
+            try:
+                self._device.set_brightness(value)
+                self._state.brightness = value
+                self._state.is_on = True
+                self._record_success()
+            except DeviceException as exc:
+                self._record_error(exc, "set_brightness")
+        self._notify()
         return value
 
     def set_color_temp(self, value: int) -> int:
         value = max(self.COLOR_TEMP_MIN, min(self.COLOR_TEMP_MAX, int(value)))
         with self._lock:
-            self._device.set_color_temp(value)
-            self._state.color_temp = value
-            self._state.is_on = True
-            self._state.reachable = True
-            self._state.error = None
+            try:
+                self._device.set_color_temp(value)
+                self._state.color_temp = value
+                self._state.is_on = True
+                self._record_success()
+            except DeviceException as exc:
+                self._record_error(exc, "set_color_temp")
+        self._notify()
         return value
 
 

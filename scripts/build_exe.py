@@ -8,30 +8,43 @@ Run from the project root with the dev/build extras installed:
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ENTRY = ROOT / "mi_monitor_light_tray" / "__main__.py"
+ENTRY = ROOT / "scripts" / "run_app.py"
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 
 
 def main() -> int:
-    if shutil.which("pyinstaller") is None:
-        print("pyinstaller is not installed. Run: pip install -e \".[build]\"", file=sys.stderr)
+    try:
+        import PyInstaller  # noqa: F401
+    except ImportError:
+        print(
+            "PyInstaller is not installed in this interpreter. Run: "
+            "pip install -e \".[build]\"",
+            file=sys.stderr,
+        )
         return 1
 
     cmd = [
-        "pyinstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--name",
         "MiMonitorLightTray",
         "--onefile",
         "--noconsole",
         "--clean",
         "--noconfirm",
+        # python-miio ships YAML/JSON specs alongside its modules. PyInstaller
+        # only picks up imported Python files by default, so the device-info
+        # parser crashes at runtime without this. ``--collect-data`` walks the
+        # package and bundles every non-Python file.
+        "--collect-data",
+        "miio",
         "--distpath",
         str(DIST),
         "--workpath",

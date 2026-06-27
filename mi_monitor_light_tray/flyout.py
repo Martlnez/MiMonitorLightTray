@@ -210,6 +210,9 @@ class FlyoutWindow:
     def schedule_close(self) -> None:
         self._root.after(0, self.hide)
 
+    def schedule_apply_state(self, state: LightState) -> None:
+        self._root.after(0, lambda: self._apply_state(state))
+
     def shutdown(self) -> None:
         self._brightness_debounce.cancel()
         self._color_temp_debounce.cancel()
@@ -288,13 +291,11 @@ class FlyoutWindow:
         threading.Thread(target=self._toggle_thread, daemon=True).start()
 
     def _toggle_thread(self) -> None:
-        try:
-            new_state = self._light.toggle()
-        except Exception as exc:  # noqa: BLE001
-            log.warning("Toggle failed: %s", exc)
-            self._root.after(0, lambda: self._status_var.set(f"Toggle failed — {exc}"))
-            return
+        new_state = self._light.toggle()
+        state = self._light.state
         self._root.after(0, lambda: self._power_btn.configure(text="On" if new_state else "Off"))
+        if not state.reachable:
+            self._root.after(0, lambda: self._status_var.set(f"Offline — {state.error or 'unreachable'}"))
 
     def _open_settings(self) -> None:
         self.hide()
