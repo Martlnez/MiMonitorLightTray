@@ -160,8 +160,8 @@ class FlyoutWindow:
     def _apply_rounded_corners(self) -> None:
         try:
             import ctypes
-            hwnd = ctypes.windll.user32.GetParent(self._root.winfo_id())
-            val  = ctypes.c_int(2)
+            hwnd = self._root.winfo_id()
+            val  = ctypes.c_int(2)   # DWMWCP_ROUND
             ctypes.windll.dwmapi.DwmSetWindowAttribute(
                 hwnd, 33, ctypes.byref(val), 4)
         except Exception:
@@ -171,8 +171,7 @@ class FlyoutWindow:
 
     def _build_ui(self) -> None:
         outer = tk.Frame(self._root, bg=self.BG)
-        outer.pack(fill="both", expand=True,
-                   padx=self.PAD_X, pady=(self.PAD_Y, 8))
+        outer.pack(fill="x", padx=self.PAD_X, pady=(self.PAD_Y, 0))
 
         self._brightness_var = tk.IntVar(value=50)
         self._color_temp_var = tk.IntVar(value=4000)
@@ -278,6 +277,8 @@ class FlyoutWindow:
         self._root.lift()
         self._root.focus_force()
         self._visible = True
+        # Apply rounded corners after window is visible (DWM requires the HWND to exist)
+        self._apply_rounded_corners()
 
     def hide(self) -> None:
         if self._visible:

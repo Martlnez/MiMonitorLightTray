@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./.venv/Scripts/python.exe -c ' *)"
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(tasklist //FI \"IMAGENAME eq python.exe\")"
     ]
   }
 }

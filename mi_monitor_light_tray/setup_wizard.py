@@ -107,8 +107,11 @@ class SetupWizard:
             canvas.itemconfig(win_id, width=e.width)
         canvas.bind("<Configure>", _on_canvas_configure)
 
-        # Mousewheel
+        # Mousewheel — clamp at top, don't scroll past 0
         def _on_wheel(e):
+            top, _ = canvas.yview()
+            if top <= 0 and e.delta > 0:
+                return  # already at top, block upward scroll
             canvas.yview_scroll(-1 * (e.delta // 120), "units")
         canvas.bind_all("<MouseWheel>", _on_wheel)
 
@@ -182,6 +185,12 @@ class SetupWizard:
         help_box.configure(state="disabled")
         help_box.grid(row=8, column=0, columnspan=2,
                       sticky="nsew", padx=16, pady=(0, 8))
+
+        # When hovering help_box, let it scroll internally; stop outer canvas scrolling
+        def _stop_outer(_e): canvas.unbind_all("<MouseWheel>")
+        def _resume_outer(_e): canvas.bind_all("<MouseWheel>", _on_wheel)
+        help_box.bind("<Enter>", _stop_outer)
+        help_box.bind("<Leave>", _resume_outer)
 
         # ── Status + buttons ───────────────────────────────────────────────────
         self._status_var = tk.StringVar(value="")
