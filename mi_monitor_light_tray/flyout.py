@@ -121,9 +121,9 @@ class _DarkSlider(tk.Canvas):
 
 
 class FlyoutWindow:
-    WIDTH    = 320
-    PAD_X    = 16
-    PAD_Y    = 14
+    WIDTH    = 290
+    PAD_X    = 12
+    PAD_Y    = 10
 
     BG       = "#1f1f1f"
     TEXT     = "#ffffff"
@@ -144,8 +144,6 @@ class FlyoutWindow:
             self._root.attributes("-alpha", 0.97)
         except tk.TclError:
             pass
-        self._apply_rounded_corners()
-
         self._brightness_debounce = Debouncer(delay=0.12)
         self._color_temp_debounce = Debouncer(delay=0.18)
         self._suppress = False

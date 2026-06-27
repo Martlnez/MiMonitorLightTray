@@ -52,10 +52,10 @@ class TrayController:
             title=title,
             menu=Menu(
                 MenuItem("Open", self._handle_open, default=True, visible=False),
-                MenuItem("Adjust…", self._handle_open),
-                MenuItem("Settings", self._handle_settings),
+                MenuItem("调整亮度", self._handle_open),
+                MenuItem("设置", self._handle_settings),
                 Menu.SEPARATOR,
-                MenuItem("Exit", self._handle_exit),
+                MenuItem("退出", self._handle_exit),
             ),
         )
         self._thread: threading.Thread | None = None
