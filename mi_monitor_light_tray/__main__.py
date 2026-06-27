@@ -5,12 +5,10 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from tkinter import messagebox
 
 from .config import AppConfig
-from .flyout import FlyoutWindow
-from .miio_client import LightState, MiMonitorLight
-from .setup_wizard import SetupWizard
-from .tray import TrayController
+from .single_instance import SingleInstance
 
 log = logging.getLogger("mi_monitor_light_tray")
 
@@ -31,8 +29,13 @@ def _quiet_miio_warnings() -> None:
 
 class App:
     def __init__(self, config: AppConfig) -> None:
+        # Lazy-import heavy modules only when App is instantiated, not at script load.
+        from .flyout import FlyoutWindow
+        from .miio_client import MiMonitorLight
+        from .tray import TrayController
+
         self._config = config
-        self._light = self._build_light(config)
+        self._light = self._build_light(config, MiMonitorLight)
         self._flyout = FlyoutWindow(self._light, on_open_setup=self._open_settings)
         self._tray = TrayController(
             title=config.device.name or "Mi Monitor Light",
@@ -41,12 +44,16 @@ class App:
             on_exit=self._on_exit,
         )
         self._light.set_listener(self._on_state_changed)
+        # Cache the imports for later use.
+        self._MiMonitorLight = MiMonitorLight
 
-    def _build_light(self, config: AppConfig) -> MiMonitorLight:
+    def _build_light(self, config: AppConfig, MiMonitorLight) -> "MiMonitorLight":
         return MiMonitorLight(
             ip=config.device.ip,
             token=config.device.token,
             model=config.device.model,
+            device_id=config.device.device_id,
+            on_ip_changed=self._on_ip_changed,
         )
 
     def run(self) -> int:
@@ -62,10 +69,19 @@ class App:
     def _on_tray_click(self, x: int, y: int) -> None:
         self._flyout.schedule_open(x, y)
 
-    def _on_state_changed(self, state: LightState) -> None:
+    def _on_state_changed(self, state: "LightState") -> None:
         # Called from worker threads — marshal to Tk thread.
         self._flyout.schedule_apply_state(state)
         self._tray.set_state(state.is_on)
+
+    def _on_ip_changed(self, new_ip: str) -> None:
+        """Called when auto-discovery finds the device at a new IP."""
+        log.info("Device IP changed to %s, updating config", new_ip)
+        self._config.device.ip = new_ip
+        try:
+            self._config.save()
+        except OSError as exc:
+            log.warning("Failed to save updated IP: %s", exc)
 
     def _open_settings(self) -> None:
         # Tk doesn't allow opening a second Tk root from another thread; route
@@ -74,6 +90,8 @@ class App:
         self._flyout._root.after(0, self._show_settings)
 
     def _show_settings(self) -> None:
+        from .setup_wizard import SetupWizard
+
         SetupWizard(
             self._config,
             on_saved=self._on_config_saved,
@@ -83,16 +101,33 @@ class App:
     def _on_config_saved(self, config: AppConfig) -> None:
         log.info("Config updated; reconnecting to %s", config.device.ip)
         self._config = config
-        self._light = self._build_light(config)
+        self._light = self._build_light(config, self._MiMonitorLight)
         self._light.set_listener(self._on_state_changed)
         self._flyout._light = self._light
         self._tray.set_title(config.device.name or "Mi Monitor Light")
+        # Trigger a refresh to capture device_id if not already saved.
+        if config.device.device_id == 0:
+            import threading
+            threading.Thread(target=self._initial_refresh, daemon=True).start()
+
+    def _initial_refresh(self) -> None:
+        """Refresh device state and save device_id to config if newly captured."""
+        self._light.refresh()
+        if self._light.device_id > 0 and self._config.device.device_id == 0:
+            self._config.device.device_id = self._light.device_id
+            try:
+                self._config.save()
+                log.info("Saved device_id %08x to config", self._light.device_id)
+            except OSError as exc:
+                log.warning("Failed to save device_id: %s", exc)
 
     def _on_exit(self) -> None:
         self._flyout.shutdown()
 
 
 def _run_setup_only(config: AppConfig) -> int:
+    from .setup_wizard import SetupWizard
+
     saved: dict = {}
 
     def _on_saved(updated: AppConfig) -> None:
@@ -122,6 +157,25 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     _quiet_miio_warnings()
+
+    # Single-instance check — prevent multiple copies running simultaneously.
+    lock = SingleInstance("MiMonitorLightTray")
+    if not lock.acquired:
+        log.warning("Another instance is already running")
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showwarning(
+                "Already Running",
+                "Mi Monitor Light Tray is already running.\n\n"
+                "Check the system tray (bottom-right corner) for the icon.",
+            )
+            root.destroy()
+        except Exception:
+            pass
+        return 1
 
     config = AppConfig.load()
 

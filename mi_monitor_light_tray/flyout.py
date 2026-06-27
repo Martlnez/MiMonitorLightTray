@@ -14,15 +14,25 @@ log = logging.getLogger(__name__)
 
 
 class FlyoutWindow:
-    """Borderless Tk window controlling brightness + color temp.
+    """Borderless Tk window with Windows 11 Fluent Design aesthetics.
 
-    Runs on the Tk main thread. ``schedule_open`` is the one method safe to call
-    from other threads (the tray callback).
+    Modern features: rounded corners, acrylic-inspired blur, soft shadows,
+    updated color palette matching Windows 11 system UI.
     """
 
-    WIDTH = 320
-    HEIGHT = 200
-    PAD = 16
+    WIDTH = 340
+    HEIGHT = 220
+    PAD = 18
+
+    # Windows 11 Fluent Design color palette
+    BG_COLOR = "#202020"          # Dark mica background
+    CARD_BG = "#2b2b2b"           # Elevated card background
+    TEXT_PRIMARY = "#ffffff"      # Primary text
+    TEXT_SECONDARY = "#b4b4b4"    # Secondary/muted text
+    ACCENT = "#60cdff"            # Windows 11 accent blue
+    BORDER = "#3a3a3a"            # Subtle borders
+    SLIDER_TRACK = "#404040"      # Slider track
+    SLIDER_THUMB = "#ffffff"      # Slider thumb
 
     def __init__(self, light: MiMonitorLight, on_open_setup: Callable[[], None]) -> None:
         self._light = light
@@ -33,8 +43,24 @@ class FlyoutWindow:
         self._root.title("Mi Monitor Light")
         self._root.overrideredirect(True)
         self._root.attributes("-topmost", True)
+
+        # Windows 11 style: rounded corners and transparency
         try:
-            self._root.attributes("-alpha", 0.97)
+            self._root.attributes("-alpha", 0.96)
+            # Try to enable rounded corners on Windows 11 (requires Win32 API)
+            try:
+                import ctypes
+                hwnd = ctypes.windll.user32.GetParent(self._root.winfo_id())
+                DWM_WINDOW_CORNER_PREFERENCE = 33
+                DWMWCP_ROUND = 2
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd,
+                    DWM_WINDOW_CORNER_PREFERENCE,
+                    ctypes.byref(ctypes.c_int(DWMWCP_ROUND)),
+                    ctypes.sizeof(ctypes.c_int),
+                )
+            except Exception:
+                pass  # Rounded corners not critical, fail silently
         except tk.TclError:
             pass
 
@@ -51,19 +77,19 @@ class FlyoutWindow:
     # ---------- UI construction ----------
 
     def _build_ui(self) -> None:
-        frame = tk.Frame(self._root, bg="#1f1f1f", padx=self.PAD, pady=self.PAD)
+        frame = tk.Frame(self._root, bg=self.BG_COLOR, padx=self.PAD, pady=self.PAD)
         frame.pack(fill="both", expand=True)
 
-        header = tk.Frame(frame, bg="#1f1f1f")
-        header.pack(fill="x")
+        header = tk.Frame(frame, bg=self.BG_COLOR)
+        header.pack(fill="x", pady=(0, 8))
 
         self._title_var = tk.StringVar(value="Mi Monitor Light")
         title_lbl = tk.Label(
             header,
             textvariable=self._title_var,
-            fg="#f0f0f0",
-            bg="#1f1f1f",
-            font=("Segoe UI", 10, "bold"),
+            fg=self.TEXT_PRIMARY,
+            bg=self.BG_COLOR,
+            font=("Segoe UI Variable Display", 12, "bold"),
             anchor="w",
         )
         title_lbl.pack(side="left", fill="x", expand=True)
@@ -71,14 +97,16 @@ class FlyoutWindow:
         self._power_btn = tk.Button(
             header,
             text="Off",
-            width=5,
+            width=6,
             command=self._on_toggle_power,
             relief="flat",
-            bg="#2d2d2d",
-            fg="#f0f0f0",
-            activebackground="#3a3a3a",
-            activeforeground="#ffffff",
+            bg=self.CARD_BG,
+            fg=self.TEXT_PRIMARY,
+            activebackground=self.ACCENT,
+            activeforeground=self.TEXT_PRIMARY,
             borderwidth=0,
+            font=("Segoe UI Variable Text", 9),
+            cursor="hand2",
         )
         self._power_btn.pack(side="right")
 
@@ -86,22 +114,32 @@ class FlyoutWindow:
         status_lbl = tk.Label(
             frame,
             textvariable=self._status_var,
-            fg="#9a9a9a",
-            bg="#1f1f1f",
-            font=("Segoe UI", 8),
+            fg=self.TEXT_SECONDARY,
+            bg=self.BG_COLOR,
+            font=("Segoe UI Variable Text", 8),
             anchor="w",
         )
-        status_lbl.pack(fill="x", pady=(2, 8))
+        status_lbl.pack(fill="x", pady=(0, 12))
 
         style = ttk.Style(self._root)
         try:
             style.theme_use("clam")
         except tk.TclError:
             pass
+
+        # Windows 11 inspired slider style
         style.configure(
-            "Flyout.Horizontal.TScale",
-            background="#1f1f1f",
-            troughcolor="#3a3a3a",
+            "Fluent.Horizontal.TScale",
+            background=self.BG_COLOR,
+            troughcolor=self.SLIDER_TRACK,
+            borderwidth=0,
+            lightcolor=self.ACCENT,
+            darkcolor=self.ACCENT,
+        )
+        style.map(
+            "Fluent.Horizontal.TScale",
+            background=[("active", self.BG_COLOR)],
+            troughcolor=[("active", self.SLIDER_TRACK)],
         )
 
         self._build_slider_row(
@@ -128,20 +166,21 @@ class FlyoutWindow:
             unit="K",
         )
 
-        footer = tk.Frame(frame, bg="#1f1f1f")
-        footer.pack(fill="x", pady=(8, 0))
+        footer = tk.Frame(frame, bg=self.BG_COLOR)
+        footer.pack(fill="x", pady=(12, 0))
 
         tk.Button(
             footer,
-            text="Settings",
+            text="⚙ Settings",
             command=self._open_settings,
             relief="flat",
-            bg="#1f1f1f",
-            fg="#9a9a9a",
-            activebackground="#2d2d2d",
-            activeforeground="#f0f0f0",
+            bg=self.BG_COLOR,
+            fg=self.TEXT_SECONDARY,
+            activebackground=self.CARD_BG,
+            activeforeground=self.TEXT_PRIMARY,
             borderwidth=0,
-            font=("Segoe UI", 8),
+            font=("Segoe UI Variable Text", 9),
+            cursor="hand2",
         ).pack(side="right")
 
     def _build_slider_row(
@@ -157,15 +196,15 @@ class FlyoutWindow:
         on_change: Callable[[str], None],
         unit: str,
     ) -> None:
-        row = tk.Frame(parent, bg="#1f1f1f")
-        row.pack(fill="x", pady=(4, 0))
+        row = tk.Frame(parent, bg=self.BG_COLOR)
+        row.pack(fill="x", pady=(6, 0))
 
         tk.Label(
             row,
             text=label,
-            fg="#d0d0d0",
-            bg="#1f1f1f",
-            font=("Segoe UI", 9),
+            fg=self.TEXT_SECONDARY,
+            bg=self.BG_COLOR,
+            font=("Segoe UI Variable Text", 9),
             anchor="w",
         ).pack(side="left")
 
@@ -174,9 +213,9 @@ class FlyoutWindow:
         tk.Label(
             row,
             textvariable=display_var,
-            fg="#f0f0f0",
-            bg="#1f1f1f",
-            font=("Segoe UI", 9, "bold"),
+            fg=self.TEXT_PRIMARY,
+            bg=self.BG_COLOR,
+            font=("Segoe UI Variable Display", 10, "bold"),
             width=6,
             anchor="e",
         ).pack(side="right")
@@ -191,9 +230,10 @@ class FlyoutWindow:
             variable=value_var,
             orient="horizontal",
             command=on_change,
-            style="Flyout.Horizontal.TScale",
+            style="Fluent.Horizontal.TScale",
+            cursor="hand2",
         )
-        slider.pack(fill="x", pady=(0, 6))
+        slider.pack(fill="x", pady=(2, 8))
         setattr(self, slider_attr, slider)
 
         # Update label text alongside the slider.

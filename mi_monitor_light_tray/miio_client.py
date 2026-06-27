@@ -33,6 +33,9 @@ class MiMonitorLight:
     waiting on the network for every paint. Errors are captured into
     ``state.error`` rather than raised so callers don't need a try/except at
     every site.
+
+    When the device becomes unreachable (e.g., IP changed via DHCP), the wrapper
+    can attempt auto-discovery if device_id is known.
     """
 
     BRIGHTNESS_MIN = 1
@@ -42,16 +45,34 @@ class MiMonitorLight:
 
     DEFAULT_MODEL = "yeelink.light.monitor1"
 
-    def __init__(self, ip: str, token: str, model: str = "") -> None:
+    def __init__(
+        self,
+        ip: str,
+        token: str,
+        model: str = "",
+        device_id: int = 0,
+        on_ip_changed: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        self._ip = ip
+        self._token = token
+        self._model = model or self.DEFAULT_MODEL
+        self._device_id = device_id
+        self._on_ip_changed = on_ip_changed
         self._lock = threading.Lock()
-        self._device = Yeelight(ip=ip, token=token, model=model or self.DEFAULT_MODEL)
+        self._device = Yeelight(ip=ip, token=token, model=self._model)
         self._state = LightState()
         self._listener: Optional[StateListener] = None
         self._last_error_log = 0.0
+        self._discovery_in_progress = False
 
     @property
     def state(self) -> LightState:
         return self._state
+
+    @property
+    def device_id(self) -> int:
+        """Return the device ID if known (retrieved from info() on first success)."""
+        return self._device_id
 
     def set_listener(self, listener: Optional[StateListener]) -> None:
         self._listener = listener
@@ -73,9 +94,51 @@ class MiMonitorLight:
         self._state.reachable = False
         self._state.error = str(exc)
 
+        # If we have a device_id and discovery isn't already running, try to find the new IP.
+        if (
+            self._device_id > 0
+            and not self._discovery_in_progress
+            and "Unable to discover" in str(exc)
+        ):
+            log.info("Device unreachable; attempting auto-discovery...")
+            threading.Thread(target=self._try_rediscover, daemon=True).start()
+
+    def _try_rediscover(self) -> None:
+        self._discovery_in_progress = True
+        try:
+            from .discovery import find_device_by_id
+
+            new_ip = find_device_by_id(self._device_id, timeout=6.0)
+            if new_ip and new_ip != self._ip:
+                log.info("Device found at new IP: %s (was %s)", new_ip, self._ip)
+                self._ip = new_ip
+                with self._lock:
+                    self._device = Yeelight(
+                        ip=new_ip, token=self._token, model=self._model
+                    )
+                if self._on_ip_changed:
+                    self._on_ip_changed(new_ip)
+                # Retry status immediately.
+                self.refresh()
+            else:
+                log.warning("Auto-discovery did not find device %08x", self._device_id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Auto-discovery failed: %s", exc)
+        finally:
+            self._discovery_in_progress = False
+
     def _record_success(self) -> None:
         self._state.reachable = True
         self._state.error = None
+
+        # Capture device_id on first successful connection if not already known.
+        if self._device_id == 0:
+            try:
+                info = self._device.info()
+                self._device_id = info.device_id
+                log.info("Captured device ID: %08x", self._device_id)
+            except Exception:  # noqa: BLE001
+                pass
 
     def refresh(self) -> LightState:
         with self._lock:

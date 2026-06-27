@@ -25,6 +25,7 @@ class DeviceConfig:
     token: str = ""
     name: str = "Mi Monitor Light"
     model: str = ""
+    device_id: int = 0  # Stored after first successful connection for auto-discovery
 
     def is_complete(self) -> bool:
         return bool(self.ip) and bool(self.token) and len(self.token) == 32
