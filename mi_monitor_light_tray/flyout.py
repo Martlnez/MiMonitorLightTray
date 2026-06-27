@@ -130,11 +130,10 @@ class FlyoutWindow:
                  font=("Segoe UI", 9), anchor="w"
                  ).pack(side="left")
 
-        # 从右到左：设置 > 电源
-        icons = [
-            ("", self._open_settings,   "设置"),
-            ("", self._on_toggle_power, "电源开关"),
-        ]
+        for glyph, cmd in reversed([
+            ("", self._open_settings),
+            ("", self._on_toggle_power),
+        ]):
             self._icon_btn(footer, glyph, cmd)
 
     def _build_device_row(
