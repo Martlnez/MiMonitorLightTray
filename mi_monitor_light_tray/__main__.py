@@ -168,9 +168,9 @@ def main(argv: list[str] | None = None) -> int:
             root = tk.Tk()
             root.withdraw()
             messagebox.showwarning(
-                "Already Running",
-                "Mi Monitor Light Tray is already running.\n\n"
-                "Check the system tray (bottom-right corner) for the icon.",
+                "已在运行",
+                "小米显示器挂灯控制程序已经在运行\n\n"
+                "请检查系统托盘（屏幕右下角）查看图标",
             )
             root.destroy()
         except Exception:

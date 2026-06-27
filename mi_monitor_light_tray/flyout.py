@@ -95,7 +95,7 @@ class FlyoutWindow:
         self._build_device_row(
             icon      = "",          # Segoe MDL2: monitor
             name_var  = None,
-            name_text = "Mi Monitor Light",
+            name_text = "显示器挂灯",
             slider_var= self._brightness_var,
             from_     = MiMonitorLight.BRIGHTNESS_MIN,
             to_       = MiMonitorLight.BRIGHTNESS_MAX,
@@ -128,10 +128,11 @@ class FlyoutWindow:
                  ).pack(side="left")
 
         # Icon buttons on the right (Segoe MDL2 Assets glyphs)
+        # 从右到左：设置 > 链接 > 电源
         icons = [
-            ("", self._on_toggle_power, "开/关"),   # power
-            ("", lambda: None,           "显示器"),  # monitor (placeholder)
-            ("", self._open_settings,    "设置"),    # settings
+            ("", self._open_settings,    "设置"),       # E713: Settings
+            ("", lambda: None,           "链接设备"),    # E710: Link (for future multi-device)
+            ("", self._on_toggle_power,  "电源开关"),    # E7E8: Power button
         ]
         for glyph, cmd, tip in reversed(icons):
             self._icon_btn(footer, glyph, cmd)

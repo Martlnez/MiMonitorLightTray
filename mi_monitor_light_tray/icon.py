@@ -1,4 +1,4 @@
-"""Generate the tray icon as an in-memory PIL image with Windows 11 Fluent Design style."""
+"""Generate the tray icon as an in-memory PIL image with Windows 11 line-art style."""
 
 from __future__ import annotations
 
@@ -6,102 +6,94 @@ from PIL import Image, ImageDraw
 
 
 def make_tray_icon(size: int = 64, on: bool = True) -> Image.Image:
-    """Create a modern, minimalist tray icon inspired by Windows 11 Fluent Design.
+    """Create a Windows 11 style line-art tray icon for a monitor light bar.
 
-    Design: A sleek monitor light bar with subtle rounded corners and a soft glow
-    when on, or a simple outline when off.
+    Design: Minimalist line-drawn monitor with a light bar on top, inspired by
+    Windows 11 Settings icons (pure lines, no fills, adaptive to system theme).
+
+    The icon uses a single solid color that works in both light and dark themes:
+    - ON:  White (#FFFFFF) - high contrast, visible on dark taskbar
+    - OFF: Gray (#888888) - muted, indicates inactive state
     """
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
 
-    # Color palette - Windows 11 inspired
+    # Color scheme - Win11 line-art style (single color, no gradients)
+    line_color = (255, 255, 255, 255) if on else (136, 136, 136, 255)
+    line_width = max(2, int(size * 0.04))  # Thicker lines for better visibility at small sizes
+
+    # Center the drawing
+    center_x = size // 2
+    center_y = size // 2
+
+    # Light bar dimensions (top horizontal bar)
+    bar_width = int(size * 0.55)
+    bar_height = int(size * 0.08)
+    bar_left = center_x - bar_width // 2
+    bar_right = center_x + bar_width // 2
+    bar_top = int(size * 0.22)
+    bar_bottom = bar_top + bar_height
+
+    # Light bar - filled rectangle with rounded corners when ON
     if on:
-        bar_color = (255, 255, 255, 255)  # Pure white bar
-        glow_primary = (255, 185, 0, 180)  # Warm amber glow
-        glow_secondary = (255, 220, 100, 120)
-        accent = (255, 200, 50, 200)
-    else:
-        bar_color = (160, 160, 160, 255)  # Neutral gray
-        glow_primary = (120, 120, 120, 80)
-        glow_secondary = None
-        accent = (140, 140, 140, 180)
-
-    # Main light bar - sleek horizontal bar with rounded ends
-    bar_top = int(size * 0.28)
-    bar_bottom = int(size * 0.42)
-    bar_left = int(size * 0.12)
-    bar_right = int(size * 0.88)
-    bar_radius = int(size * 0.07)
-
-    # Glow effect when on - soft layered gradient
-    if on:
-        # Outer glow
-        for i in range(4):
-            alpha_factor = (4 - i) / 4.0
-            glow_y_offset = int(size * 0.03 * i)
-            d.rounded_rectangle(
-                [
-                    bar_left - i * 2,
-                    bar_bottom,
-                    bar_right + i * 2,
-                    bar_bottom + int(size * 0.48) + glow_y_offset,
-                ],
-                radius=bar_radius + i * 2,
-                fill=(
-                    glow_secondary[0] if glow_secondary else glow_primary[0],
-                    glow_secondary[1] if glow_secondary else glow_primary[1],
-                    glow_secondary[2] if glow_secondary else glow_primary[2],
-                    int((glow_secondary[3] if glow_secondary else glow_primary[3]) * alpha_factor * 0.4),
-                ),
-            )
-
-        # Core glow
+        # Filled bar with slight rounding
         d.rounded_rectangle(
-            [bar_left, bar_bottom, bar_right, bar_bottom + int(size * 0.38)],
-            radius=bar_radius,
-            fill=glow_primary,
+            [bar_left, bar_top, bar_right, bar_bottom],
+            radius=int(size * 0.04),
+            fill=line_color,
+        )
+    else:
+        # Outline only when OFF
+        d.rounded_rectangle(
+            [bar_left, bar_top, bar_right, bar_bottom],
+            radius=int(size * 0.04),
+            outline=line_color,
+            width=line_width,
         )
 
-    # Main light bar body
+    # Monitor screen - rounded rectangle outline
+    screen_width = int(size * 0.50)
+    screen_height = int(size * 0.32)
+    screen_left = center_x - screen_width // 2
+    screen_right = center_x + screen_width // 2
+    screen_top = int(size * 0.38)
+    screen_bottom = screen_top + screen_height
+
     d.rounded_rectangle(
-        [bar_left, bar_top, bar_right, bar_bottom],
-        radius=bar_radius,
-        fill=bar_color,
+        [screen_left, screen_top, screen_right, screen_bottom],
+        radius=int(size * 0.03),
+        outline=line_color,
+        width=line_width,
     )
 
-    # Accent LED indicators on bar (small dots)
-    led_y = (bar_top + bar_bottom) // 2
-    led_radius = max(1, int(size * 0.025))
-    led_spacing = (bar_right - bar_left) // 4
+    # Monitor stand - simple vertical line + base
+    stand_top = screen_bottom
+    stand_bottom = int(size * 0.80)
+    stand_x = center_x
 
-    for i in range(3):
-        led_x = bar_left + led_spacing * (i + 1)
+    d.line(
+        [(stand_x, stand_top), (stand_x, stand_bottom)],
+        fill=line_color,
+        width=line_width,
+    )
+
+    # Monitor base - horizontal line
+    base_width = int(size * 0.25)
+    base_y = stand_bottom
+    d.line(
+        [(center_x - base_width // 2, base_y), (center_x + base_width // 2, base_y)],
+        fill=line_color,
+        width=line_width,
+    )
+
+    # Glow indicator when ON - small circle/dot above the bar
+    if on:
+        glow_radius = int(size * 0.04)
+        glow_y = bar_top - int(size * 0.08)
         d.ellipse(
-            [led_x - led_radius, led_y - led_radius, led_x + led_radius, led_y + led_radius],
-            fill=accent,
+            [center_x - glow_radius, glow_y - glow_radius,
+             center_x + glow_radius, glow_y + glow_radius],
+            fill=line_color,
         )
-
-    # Minimal mount bracket - thin vertical line
-    bracket_w = max(1, int(size * 0.015))
-    bracket_h = int(size * 0.12)
-    bracket_top = max(1, bar_top - bracket_h)
-    bracket_x = size // 2
-
-    d.rectangle(
-        [bracket_x - bracket_w, bracket_top, bracket_x + bracket_w, bar_top],
-        fill=bar_color,
-    )
-
-    # Subtle top connector
-    connector_radius = int(size * 0.04)
-    d.ellipse(
-        [
-            bracket_x - connector_radius,
-            bracket_top - connector_radius // 2,
-            bracket_x + connector_radius,
-            bracket_top + connector_radius // 2,
-        ],
-        fill=(bar_color[0], bar_color[1], bar_color[2], int(bar_color[3] * 0.7)),
-    )
 
     return img
