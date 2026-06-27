@@ -57,6 +57,16 @@ class _DarkSlider(tk.Canvas):
         r = self.THUMB_R
         return int(r + self._frac() * (w - 2 * r))
 
+    def _draw_circle(self, cx: int, cy: int, r: int, color: str) -> None:
+        """Draw an anti-aliased-looking circle using a smooth polygon."""
+        import math
+        n = 32  # enough points for a smooth circle at this size
+        pts = []
+        for i in range(n):
+            a = 2 * math.pi * i / n
+            pts.extend([cx + r * math.cos(a), cy + r * math.sin(a)])
+        self.create_polygon(pts, fill=color, outline="", smooth=True)
+
     def _redraw(self, *_, hover: Optional[bool] = None) -> None:
         if hover is not None:
             self._hover = hover
@@ -77,10 +87,9 @@ class _DarkSlider(tk.Canvas):
             self.create_rounded_rect(r, cy - self.TRACK_H // 2,
                                       tx, cy + self.TRACK_H // 2,
                                       2, fill=self.TRACK_FG)
-        # Thumb
+        # Thumb — smooth polygon circle (no jagged edges)
         col = self.THUMB_HOV if self._hover else self.THUMB_BG
-        self.create_oval(tx - r, cy - r, tx + r, cy + r,
-                         fill=col, outline="")
+        self._draw_circle(tx, cy, r, col)
 
     def create_rounded_rect(self, x1, y1, x2, y2, r, **kw):
         r = min(r, (x2 - x1) // 2, (y2 - y1) // 2)
