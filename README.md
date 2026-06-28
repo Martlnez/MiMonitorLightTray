@@ -8,7 +8,33 @@
 
 ## 兼容设备
 
-本程序按设备 `model` **自动选择 legacy 或 MIoT 协议**：lamp22（显示器挂灯 1S）等新机型走 MIoT，[`(siid, piid)`](mi_monitor_light_tray/miio_client.py) 数字寻址；老一代台灯走 legacy（`set_bright` / `set_ct_abx`）。色温区间按以下顺序解析：
+本程序按设备 `model` **自动选择 legacy 或 MIoT 协议**。除少数手工 curated 的机型外，**~2100 个 MIoT 灯具的协议映射与色温范围已从 [home.miot-spec.com](https://home.miot-spec.com) 抓取并嵌入** ([mi_monitor_light_tray/_miot_data.py](mi_monitor_light_tray/_miot_data.py))，覆盖 yeelink、xiaomi、mijia 以及大量第三方品牌。
+
+**路由决策**（按 model 在以下集合的成员关系自动推导）：
+
+1. **curated `_MIOT_MAPPINGS`**（[miio_client.py](mi_monitor_light_tray/miio_client.py) 顶部，含 lamp22）→ MIoT
+2. **python-miio `YeelightSpecHelper`**（specs.yaml 已知的 legacy 设备，41 个）→ legacy
+3. **本项目 curated `MODEL_CT_RANGES`**（手工验证过 legacy 的设备，如 lamp2）→ legacy
+4. **bulk `_miot_data`**（前 3 个都没听说过的 MIoT-only 设备，~2100 个）→ MIoT
+5. **完全未知** → legacy（兜底，配合「启用 MIoT 实验性」开关可改走 MIoT）
+
+**色温范围解析**（同样优先级）：curated 覆盖表 > YeelightSpecHelper > bulk → 默认 2700–6500K。bulk 数据有合理性过滤（min ≥ 1000K、max ∈ [2000, 15000]K、span ≥ 500K），拒绝 spec 里把色温单位错标成 percentage 的伪 Kelvin 条目（~7% 的源数据是这样）。
+
+下表只列重点机型，其它任何在嵌入数据库里的设备都会自动拿到正确协议与色温区间：
+
+| 型号 ID | 设备 | 协议 | 色温范围 | 数据来源 |
+|---|---|---|---|---|
+| `yeelink.light.lamp22` | 米家智能显示器挂灯 1S（默认型号） | MIoT   | 2700–6500 K | curated |
+| `yeelink.light.lamp1`  | 米家台灯                          | legacy | 2700–5000 K | YeelightSpecHelper |
+| `yeelink.light.lamp2`  | 米家台灯 Pro                      | legacy | 2500–4800 K | 项目覆盖表 |
+| `yeelink.light.lamp4`  | 米家台灯 1S                       | legacy | 2600–5000 K | YeelightSpecHelper |
+| `yeelink.light.ceiling*` 系列 | 米家智能吸顶灯 | legacy | 2700–6500 K | YeelightSpecHelper |
+| `yeelink.light.bslamp*` | 米家床头灯 | legacy | 1700–6500 K | YeelightSpecHelper |
+| 其它 ~2100 个 MIoT-only 机型 | 各品牌新型智能灯 | MIoT | 按 spec | _miot_data.py（bulk） |
+
+如果你的机型不在任何来源里 → 程序按 legacy 处理。MIoT-only 但未被收录的新机型可在 **设置** 里勾选 **启用 MIoT（实验性）** 强制走 MIoT 通用 Light service spec 试探。
+
+> **反馈兼容性问题时请带上 `model` 字段**（例如 `yeelink.light.lamp22`），这是定位设备协议、色温区间的关键信息。可在配置文件 `%APPDATA%\MiMonitorLightTray\config.json` 的 `device.model` 看到，或者用 `miiocli device --ip <IP> --token <token> info` 查。
 
 1. 本项目的 [`MODEL_CT_RANGES`](mi_monitor_light_tray/miio_client.py) 覆盖表（极少数特例）；
 2. **python-miio 自带的 `specs.yaml` 数据库**（约 40 个 Yeelight 机型，本项目直接复用 `YeelightSpecHelper`，不需要我们维护）；
@@ -239,7 +265,10 @@ A：这是有意的防抖（120ms 亮度 / 180ms 色温），用来合并请求�
 
 ## Roadmap
 
-- 兼容设备表欢迎社区按真实设备 PR 补充（型号 ID + 协议 + 色温范围 + 实测的设备名称）。新增 MIoT 设备时除了在 `MODEL_CT_RANGES` 加一行，还要在 `_MIOT_MAPPINGS` 里加一份 `(siid, piid)` 映射 —— 模板见 [miio_client.py](mi_monitor_light_tray/miio_client.py) 顶部。
+- 兼容设备表欢迎社区按真实设备 PR 补充。修正路径：
+  - **bulk 数据某条不对**（色温范围错、不应走 MIoT 等）→ 在 [miio_client.py](mi_monitor_light_tray/miio_client.py) 的 `MODEL_CT_RANGES` 或 `_MIOT_MAPPINGS` 加一条 override（curated 优先于 bulk）
+  - **新增未收录的 MIoT 机型** → 拿到该机型的 `(siid, piid)` 映射后加进 `_MIOT_MAPPINGS`
+  - **重新抓取/更新 bulk 数据库** → 见 [scripts/fetch_miot_specs.py](scripts/fetch_miot_specs.py)（本地工具，不进 git）
 
 ## 致谢
 

@@ -8,22 +8,31 @@ A Windows system-tray utility that controls Xiaomi / Yeelight monitor light bars
 
 ## Supported devices
 
-The app **picks the protocol per device `model`** — `lamp22` (Mi Smart Monitor Light Bar 1S) and other newer models speak [MIoT](mi_monitor_light_tray/miio_client.py) (`(siid, piid)`-addressed properties), while older desk lamps speak legacy Yeelight (`set_bright` / `set_ct_abx`). Color-temperature ranges resolve in this order:
+The app **picks the protocol per device `model`** automatically. Beyond a small hand-curated set, **~2100 MIoT light specs (protocol mappings + CT ranges) have been scraped from [home.miot-spec.com](https://home.miot-spec.com) and embedded** ([mi_monitor_light_tray/_miot_data.py](mi_monitor_light_tray/_miot_data.py)), covering yeelink, xiaomi, mijia and many third-party brands.
 
-1. The project's [`MODEL_CT_RANGES`](mi_monitor_light_tray/miio_client.py) override table (rare special cases);
-2. **python-miio's bundled `specs.yaml`** (~40 Yeelight models, consumed via `YeelightSpecHelper` — we don't maintain it);
-3. Conservative default `2700–6500 K`.
+**Routing decision** (derived from set membership in this order):
 
-The table below highlights key models; any Yeelight device that exists in python-miio's known list automatically picks up the correct CT range. After the first successful connection, the real model reported by `info()` confirms protocol + range, and the slider clamps any out-of-range value to whatever the hardware actually supports.
+1. **Curated `_MIOT_MAPPINGS`** ([miio_client.py](mi_monitor_light_tray/miio_client.py) top, contains lamp22) → MIoT
+2. **python-miio `YeelightSpecHelper`** (specs.yaml — 41 known legacy Yeelight devices) → legacy
+3. **Project `MODEL_CT_RANGES`** (hand-verified legacy devices like lamp2) → legacy
+4. **Bulk `_miot_data`** (~2100 MIoT-only devices that none of the above knew) → MIoT
+5. **Truly unknown** → legacy (fallback; user can flip with **Enable MIoT (experimental)**)
+
+**CT range resolution** uses the same precedence: curated overrides > YeelightSpecHelper > bulk → default 2700–6500K. Bulk data passes a plausibility filter (min ≥ 1000K, max ∈ [2000, 15000]K, span ≥ 500K) that rejects specs where the color-temperature property is mis-declared in percentage instead of Kelvin — about 7% of the upstream corpus is broken that way.
+
+The table below highlights key models; every other device in the embedded database picks up correct protocol + CT range automatically:
 
 | Model ID | Device | Protocol | CT range | Source |
 |---|---|---|---|---|
-| `yeelink.light.lamp22` | Mi Smart Monitor Light Bar 1S (default model) | MIoT   | 2700–6500 K | python-miio specs.yaml |
-| `yeelink.light.lamp1`  | Mi LED Smart Desk Lamp (米家台灯)             | legacy | 2700–5000 K | python-miio specs.yaml |
-| `yeelink.light.lamp2`  | Mi Smart LED Desk Lamp Pro (米家台灯 Pro)     | legacy | 2500–4800 K | project override (not in specs.yaml) |
-| `yeelink.light.lamp4`  | Mi LED Desk Lamp 1S (米家台灯 1S)             | legacy | 2600–5000 K | python-miio specs.yaml |
+| `yeelink.light.lamp22` | Mi Smart Monitor Light Bar 1S (default model) | MIoT   | 2700–6500 K | curated |
+| `yeelink.light.lamp1`  | Mi LED Smart Desk Lamp (米家台灯)             | legacy | 2700–5000 K | YeelightSpecHelper |
+| `yeelink.light.lamp2`  | Mi Smart LED Desk Lamp Pro (米家台灯 Pro)     | legacy | 2500–4800 K | project override |
+| `yeelink.light.lamp4`  | Mi LED Desk Lamp 1S (米家台灯 1S)             | legacy | 2600–5000 K | YeelightSpecHelper |
+| `yeelink.light.ceiling*` | Mi Smart Ceiling Light series                | legacy | 2700–6500 K | YeelightSpecHelper |
+| `yeelink.light.bslamp*`  | Mi Bedside Lamp series                       | legacy | 1700–6500 K | YeelightSpecHelper |
+| ~2100 other MIoT-only lights | Various branded smart lights              | MIoT   | per spec    | _miot_data.py (bulk) |
 
-Any Yeelight device not listed here but present in python-miio's specs.yaml picks up its CT range automatically; otherwise it falls back to 2700–6500 K. If your model is MIoT and not yet covered, you need to add the `(siid, piid)` mapping to `_MIOT_MAPPINGS` — otherwise it'll be treated as legacy.
+If your model is in none of the sources → the app falls back to legacy. For MIoT-only models that aren't covered yet, tick **Enable MIoT (experimental)** in the settings dialog to probe with the generic Light-service spec.
 
 > **When filing a compatibility issue, include the `model` field** (e.g. `yeelink.light.lamp22`) — it pins down the protocol and CT range. You can read it from `device.model` in `%APPDATA%\MiMonitorLightTray\config.json`, or run `miiocli device --ip <IP> --token <token> info`.
 
@@ -240,7 +249,10 @@ That's intentional debouncing (120 ms brightness / 180 ms color temperature) to 
 
 ## Roadmap
 
-- The supported-device table is community-driven — PRs adding verified entries are welcome (model id + protocol + CT range + recognisable device name). For MIoT devices you'll also need to add a `(siid, piid)` mapping to `_MIOT_MAPPINGS` in [miio_client.py](mi_monitor_light_tray/miio_client.py) — copy the existing `lamp22` block as a template.
+- The supported-device table is community-driven — PRs welcome. Patch paths:
+  - **Bulk entry is wrong** (wrong CT range, shouldn't be MIoT, etc.) → add an override to `MODEL_CT_RANGES` or `_MIOT_MAPPINGS` in [miio_client.py](mi_monitor_light_tray/miio_client.py). Curated entries always win over bulk.
+  - **MIoT-only model not yet covered** → grab its `(siid, piid)` mapping and add it to `_MIOT_MAPPINGS`.
+  - **Re-scrape / refresh the bulk database** → see [scripts/fetch_miot_specs.py](scripts/fetch_miot_specs.py) (local tooling, not in git).
 
 ## Acknowledgements
 

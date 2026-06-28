@@ -139,7 +139,7 @@ class SetupWizard:
             ("显示名称",    self._name_var,  False,
              "托盘中显示的设备名称"),
             ("型号（可选）", self._model_var, False,
-             "留空自动识别\n如: yeelink.light.lamp22"),
+             "留空自动识别，填写错误可能导致功能异常\n如: yeelink.light.lamp22"),
         ]
 
         self._token_entry: Optional[ttk.Entry] = None
