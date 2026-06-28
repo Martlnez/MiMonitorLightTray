@@ -182,16 +182,48 @@ class SetupWizard:
                         command=_toggle_autostart
                         ).grid(row=5, column=0, sticky="w", padx=16)
 
+        # ── New per-device toggles ─────────────────────────────────────────────
+        self._power_on_at_startup_var = tk.BooleanVar(
+            value=self._config.device.power_on_at_startup)
+        cb_on = ttk.Checkbutton(
+            frm, text="灯跟随软件启动",
+            variable=self._power_on_at_startup_var,
+        )
+        cb_on.grid(row=6, column=0, sticky="w", padx=16, pady=(4, 0))
+        _Tooltip(cb_on, "勾选后：程序启动时自动开灯")
+
+        self._power_off_at_exit_var = tk.BooleanVar(
+            value=self._config.device.power_off_at_exit)
+        cb_off = ttk.Checkbutton(
+            frm, text="灯跟随软件关闭",
+            variable=self._power_off_at_exit_var,
+        )
+        cb_off.grid(row=6, column=1, sticky="w", padx=16, pady=(4, 0))
+        _Tooltip(cb_off, "勾选后：程序退出时自动关灯")
+
+        self._enable_miot_var = tk.BooleanVar(
+            value=self._config.device.enable_miot_for_unknown)
+        cb_miot = ttk.Checkbutton(
+            frm, text="启用 MIoT（实验性）",
+            variable=self._enable_miot_var,
+        )
+        cb_miot.grid(row=7, column=0, columnspan=2, sticky="w", padx=16,
+                     pady=(4, 0))
+        _Tooltip(cb_miot,
+                 "对未列入 MIoT 白名单的新型 Yeelight 设备，\n"
+                 "尝试用通用 Light service spec 走 MIoT 协议。\n"
+                 "若设备不兼容则会持续报错 — 取消勾选即可回到 legacy。")
+
         frm.columnconfigure(1, weight=1)
 
         # ── Separator + help ───────────────────────────────────────────────────
-        ttk.Separator(frm).grid(row=6, column=0, columnspan=2,
+        ttk.Separator(frm).grid(row=8, column=0, columnspan=2,
                                 sticky="ew", pady=(12, 4))
 
         ttk.Label(frm, text="如何获取参数？",
                   font=("Microsoft YaHei UI", 9, "bold"),
                   foreground="#0066cc", cursor="hand2",
-                  ).grid(row=7, column=0, columnspan=2,
+                  ).grid(row=9, column=0, columnspan=2,
                          sticky="w", padx=16, pady=(4, 6))
 
         help_box = tk.Text(
@@ -202,7 +234,7 @@ class SetupWizard:
         )
         help_box.insert("1.0", _HELP_TEXT)
         help_box.configure(state="disabled")
-        help_box.grid(row=8, column=0, columnspan=2,
+        help_box.grid(row=10, column=0, columnspan=2,
                       sticky="nsew", padx=16, pady=(0, 8))
 
         # When hovering help_box, let it scroll internally; stop outer canvas scrolling
@@ -215,11 +247,11 @@ class SetupWizard:
         self._status_var = tk.StringVar(value="")
         ttk.Label(frm, textvariable=self._status_var,
                   foreground="#0066cc"
-                  ).grid(row=9, column=0, columnspan=2,
+                  ).grid(row=11, column=0, columnspan=2,
                          sticky="w", padx=16)
 
         btn_row = ttk.Frame(frm)
-        btn_row.grid(row=10, column=0, columnspan=2,
+        btn_row.grid(row=12, column=0, columnspan=2,
                      sticky="e", pady=(12, 4), padx=16)
 
         ttk.Button(btn_row, text="取消",
@@ -247,6 +279,9 @@ class SetupWizard:
             name=self._name_var.get().strip() or "显示器挂灯",
             model=self._model_var.get().strip(),
             device_id=self._tested_device_id or self._config.device.device_id,
+            enable_miot_for_unknown=self._enable_miot_var.get(),
+            power_on_at_startup=self._power_on_at_startup_var.get(),
+            power_off_at_exit=self._power_off_at_exit_var.get(),
         )
 
     def _on_test(self) -> None:

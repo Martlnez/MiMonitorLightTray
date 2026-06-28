@@ -42,10 +42,22 @@ class App:
             on_left_click=self._on_tray_click,
             on_open_settings=self._open_settings,
             on_exit=self._on_exit,
+            get_power_on_at_startup=lambda: self._config.device.power_on_at_startup,
+            on_toggle_power_on_at_startup=self._toggle_power_on_at_startup,
+            get_power_off_at_exit=lambda: self._config.device.power_off_at_exit,
+            on_toggle_power_off_at_exit=self._toggle_power_off_at_exit,
         )
         self._light.set_listener(self._on_state_changed)
         # Cache the imports for later use.
         self._MiMonitorLight = MiMonitorLight
+        # Track whether the atexit shutdown has already run, so we don't double-fire
+        # when both the tray-exit path and the interpreter atexit hook trigger.
+        self._shutdown_done = False
+        # Register the atexit backstop unconditionally — it's a no-op if the
+        # power_off_at_exit flag is false at exit time. Covers exit paths that
+        # bypass the tray menu (Ctrl+C, taskbar close, sys.exit).
+        import atexit
+        atexit.register(self._atexit_shutdown)
 
     def _build_light(self, config: AppConfig, MiMonitorLight) -> "MiMonitorLight":
         return MiMonitorLight(
@@ -54,15 +66,73 @@ class App:
             model=config.device.model,
             device_id=config.device.device_id,
             on_ip_changed=self._on_ip_changed,
+            on_range_changed=self._on_ct_range_changed,
+            enable_miot_for_unknown=config.device.enable_miot_for_unknown,
         )
 
     def run(self) -> int:
         self._tray.start()
+        if self._config.device.power_on_at_startup:
+            import threading
+            threading.Thread(target=self._startup_power_on, daemon=True).start()
         try:
             self._flyout.run()
         finally:
+            # Primary shutdown path: clean tray "退出". Idempotent — atexit
+            # backstop will see _shutdown_done and skip.
+            self._run_shutdown_power_off()
             self._tray.stop()
         return 0
+
+    def _startup_power_on(self) -> None:
+        """Light follows app startup — refresh, then turn on if reachable."""
+        state = self._light.refresh()
+        if state.reachable:
+            self._light.set_power(True)
+            log.info("Startup power-on sent")
+        else:
+            log.info("Skipping startup power-on: device unreachable (%s)", state.error)
+
+    def _run_shutdown_power_off(self) -> None:
+        """Send power-off if configured. Idempotent; safe to call multiple times."""
+        if self._shutdown_done:
+            return
+        self._shutdown_done = True
+        if not self._config.device.power_off_at_exit:
+            return
+        log.info("Sending shutdown power-off…")
+        try:
+            self._light.set_power(False)
+            if self._light.state.reachable:
+                log.info("Shutdown power-off acknowledged")
+            else:
+                log.warning("Shutdown power-off failed: %s", self._light.state.error)
+        except Exception:  # noqa: BLE001
+            log.exception("Shutdown power-off raised")
+
+    def _atexit_shutdown(self) -> None:
+        """Backstop for exit paths that bypass the tray menu (Ctrl+C, taskbar X)."""
+        self._run_shutdown_power_off()
+
+    def _toggle_power_on_at_startup(self) -> None:
+        new_value = not self._config.device.power_on_at_startup
+        self._config.device.power_on_at_startup = new_value
+        try:
+            self._config.save()
+            log.info("power_on_at_startup toggled to %s", new_value)
+        except OSError as exc:
+            log.warning("Failed to save power_on_at_startup: %s", exc)
+            self._config.device.power_on_at_startup = not new_value
+
+    def _toggle_power_off_at_exit(self) -> None:
+        new_value = not self._config.device.power_off_at_exit
+        self._config.device.power_off_at_exit = new_value
+        try:
+            self._config.save()
+            log.info("power_off_at_exit toggled to %s", new_value)
+        except OSError as exc:
+            log.warning("Failed to save power_off_at_exit: %s", exc)
+            self._config.device.power_off_at_exit = not new_value
 
     # ---------- callbacks ----------
 
@@ -82,6 +152,10 @@ class App:
             self._config.save()
         except OSError as exc:
             log.warning("Failed to save updated IP: %s", exc)
+
+    def _on_ct_range_changed(self, lo: int, hi: int) -> None:
+        """Called from a worker thread once info() resolves the model — push to UI."""
+        self._flyout.schedule_apply_ct_range(lo, hi)
 
     def _open_settings(self) -> None:
         # Tk doesn't allow opening a second Tk root from another thread; route
@@ -104,6 +178,12 @@ class App:
         self._light = self._build_light(config, self._MiMonitorLight)
         self._light.set_listener(self._on_state_changed)
         self._flyout._light = self._light
+        # Reset slider bounds to whatever the freshly-built light reports —
+        # info() will refine them once we reconnect, but this keeps the slider
+        # consistent if the user picked a different model in the wizard.
+        self._flyout.schedule_apply_ct_range(
+            self._light.color_temp_min, self._light.color_temp_max
+        )
         self._tray.set_title(config.device.name or "Mi Monitor Light")
         # Trigger a refresh to capture device_id if not already saved.
         if config.device.device_id == 0:

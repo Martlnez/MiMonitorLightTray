@@ -31,6 +31,14 @@ class DeviceConfig:
     name: str = "Mi Monitor Light"
     model: str = ""
     device_id: int = 0  # Stored after first successful connection for auto-discovery
+    # Treat unknown models as MIoT and probe with the lamp22 generic Light-service
+    # mapping. Default off — only opt-in for users with newer Yeelight devices
+    # that aren't in _MIOT_MAPPINGS yet but share the standard Light spec.
+    enable_miot_for_unknown: bool = False
+    # Power the light on when the tray app starts.
+    power_on_at_startup: bool = False
+    # Power the light off when the tray app exits.
+    power_off_at_exit: bool = False
 
     def is_complete(self) -> bool:
         return bool(self.ip) and bool(self.token) and len(self.token) == 32

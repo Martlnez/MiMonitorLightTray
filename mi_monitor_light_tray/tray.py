@@ -42,10 +42,18 @@ class TrayController:
         on_left_click: Callable[[int, int], None],
         on_open_settings: Callable[[], None],
         on_exit: Callable[[], None],
+        get_power_on_at_startup: Callable[[], bool],
+        on_toggle_power_on_at_startup: Callable[[], None],
+        get_power_off_at_exit: Callable[[], bool],
+        on_toggle_power_off_at_exit: Callable[[], None],
     ) -> None:
         self._on_left_click = on_left_click
         self._on_open_settings = on_open_settings
         self._on_exit = on_exit
+        self._get_power_on_at_startup = get_power_on_at_startup
+        self._on_toggle_power_on_at_startup = on_toggle_power_on_at_startup
+        self._get_power_off_at_exit = get_power_off_at_exit
+        self._on_toggle_power_off_at_exit = on_toggle_power_off_at_exit
 
         self._icon = pystray.Icon(
             "mi-monitor-light-tray",
@@ -59,6 +67,16 @@ class TrayController:
                     "开机自启动",
                     self._handle_toggle_autostart,
                     checked=lambda _i: autostart.is_enabled(),
+                ),
+                MenuItem(
+                    "灯跟随软件启动",
+                    self._handle_toggle_power_on_at_startup,
+                    checked=lambda _i: self._get_power_on_at_startup(),
+                ),
+                MenuItem(
+                    "灯跟随软件关闭",
+                    self._handle_toggle_power_off_at_exit,
+                    checked=lambda _i: self._get_power_off_at_exit(),
                 ),
                 Menu.SEPARATOR,
                 MenuItem("退出", self._handle_exit),
@@ -98,6 +116,26 @@ class TrayController:
         new_state = autostart.toggle()
         log.info("Autostart toggled to %s", new_state)
         # Force the menu to redraw so the checkmark reflects the new state.
+        try:
+            icon.update_menu()
+        except Exception:  # noqa: BLE001
+            log.debug("update_menu failed", exc_info=True)
+
+    def _handle_toggle_power_on_at_startup(self, icon, _item) -> None:
+        try:
+            self._on_toggle_power_on_at_startup()
+        except Exception:  # noqa: BLE001
+            log.exception("power_on_at_startup toggle failed")
+        try:
+            icon.update_menu()
+        except Exception:  # noqa: BLE001
+            log.debug("update_menu failed", exc_info=True)
+
+    def _handle_toggle_power_off_at_exit(self, icon, _item) -> None:
+        try:
+            self._on_toggle_power_off_at_exit()
+        except Exception:  # noqa: BLE001
+            log.exception("power_off_at_exit toggle failed")
         try:
             icon.update_menu()
         except Exception:  # noqa: BLE001

@@ -18,8 +18,11 @@ def test_appconfig_roundtrip(tmp_path: Path):
             ip="10.0.0.5",
             token="a" * 32,
             name="Bar",
-            model="yeelink.light.monitor1",
+            model="yeelink.light.lamp22",
             device_id=875277841,
+            enable_miot_for_unknown=True,
+            power_on_at_startup=True,
+            power_off_at_exit=True,
         ),
     )
     p = tmp_path / "cfg.json"
@@ -28,8 +31,26 @@ def test_appconfig_roundtrip(tmp_path: Path):
     assert loaded.device.ip == "10.0.0.5"
     assert loaded.device.token == "a" * 32
     assert loaded.device.name == "Bar"
-    assert loaded.device.model == "yeelink.light.monitor1"
+    assert loaded.device.model == "yeelink.light.lamp22"
     assert loaded.device.device_id == 875277841
+    assert loaded.device.enable_miot_for_unknown is True
+    assert loaded.device.power_on_at_startup is True
+    assert loaded.device.power_off_at_exit is True
+
+
+def test_appconfig_new_flags_default_false(tmp_path: Path):
+    """Loading an old config without the new flags must default them to False."""
+    p = tmp_path / "old.json"
+    p.write_text(
+        json.dumps({
+            "device": {"ip": "1.2.3.4", "token": "t" * 32, "name": "X"},
+        }),
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(p)
+    assert cfg.device.enable_miot_for_unknown is False
+    assert cfg.device.power_on_at_startup is False
+    assert cfg.device.power_off_at_exit is False
 
 
 def test_appconfig_missing_file_returns_default(tmp_path: Path):

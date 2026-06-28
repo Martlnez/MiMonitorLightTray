@@ -123,6 +123,18 @@ class _DarkSlider(tk.Canvas):
         step = 1 if e.delta > 0 else -1
         self._set(max(self._from, min(self._to, self._var.get() + step)))
 
+    def set_range(self, from_: int, to_: int) -> None:
+        """Update the slider's bounds and re-clamp the current value into them."""
+        if from_ == self._from and to_ == self._to:
+            return
+        self._from = from_
+        self._to = to_
+        current = self._var.get()
+        clamped = max(from_, min(to_, current))
+        if clamped != current:
+            self._var.set(clamped)
+        self._redraw()
+
     def _set(self, val: int) -> None:
         self._var.set(val)
         self._cmd(str(val))
@@ -192,8 +204,8 @@ class FlyoutWindow:
 
         self._build_row(outer, "", "色温",
                         self._color_temp_var,
-                        MiMonitorLight.COLOR_TEMP_MIN,
-                        MiMonitorLight.COLOR_TEMP_MAX,
+                        self._light.color_temp_min,
+                        self._light.color_temp_max,
                         "K", self._on_color_temp)
 
         # ── Footer ───────────────────────────────────────────────────────────
@@ -265,6 +277,10 @@ class FlyoutWindow:
     def schedule_apply_state(self, state: LightState) -> None:
         self._root.after(0, lambda: self._apply_state(state))
 
+    def schedule_apply_ct_range(self, lo: int, hi: int) -> None:
+        """Push a new color-temp slider range from any thread."""
+        self._root.after(0, lambda: self._apply_ct_range(lo, hi))
+
     def shutdown(self) -> None:
         self._brightness_debounce.cancel()
         self._color_temp_debounce.cancel()
@@ -316,7 +332,10 @@ class FlyoutWindow:
             b = max(MiMonitorLight.BRIGHTNESS_MIN,
                     state.brightness or MiMonitorLight.BRIGHTNESS_MIN)
             self._brightness_var.set(b)
-            self._color_temp_var.set(state.color_temp or 4000)
+            ct = state.color_temp or 4000
+            ct = max(self._light.color_temp_min,
+                     min(self._light.color_temp_max, ct))
+            self._color_temp_var.set(ct)
         finally:
             self._suppress = False
 
@@ -324,6 +343,17 @@ class FlyoutWindow:
             self._status_var.set("已开灯" if state.is_on else "已关灯")
         else:
             self._status_var.set(f"离线 — {(state.error or '')[:40]}")
+
+    def _apply_ct_range(self, lo: int, hi: int) -> None:
+        """Update the color-temp slider's bounds — called after model is resolved."""
+        slider = getattr(self, "_color_temp_slider", None)
+        if slider is None:
+            return
+        self._suppress = True
+        try:
+            slider.set_range(lo, hi)
+        finally:
+            self._suppress = False
 
     # ── callbacks ────────────────────────────────────────────────────────────
 

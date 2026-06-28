@@ -8,11 +8,24 @@ A Windows system-tray utility that controls Xiaomi / Yeelight monitor light bars
 
 ## Supported devices
 
-Any Xiaomi / Yeelight tunable-white light that speaks the standard Yeelight miio commands (`set_bright` / `set_ct_abx`):
+The app **picks the protocol per device `model`** — `lamp22` (Mi Smart Monitor Light Bar 1S) and other newer models speak [MIoT](mi_monitor_light_tray/miio_client.py) (`(siid, piid)`-addressed properties), while older desk lamps speak legacy Yeelight (`set_bright` / `set_ct_abx`). Color-temperature ranges resolve in this order:
 
-- `yeelink.light.monitor1` — Mi monitor light bar (default model)
-- `yeelink.light.monitor2`
-- `yeelink.light.lamp22` and other Yeelight white-tunable WiFi lights
+1. The project's [`MODEL_CT_RANGES`](mi_monitor_light_tray/miio_client.py) override table (rare special cases);
+2. **python-miio's bundled `specs.yaml`** (~40 Yeelight models, consumed via `YeelightSpecHelper` — we don't maintain it);
+3. Conservative default `2700–6500 K`.
+
+The table below highlights key models; any Yeelight device that exists in python-miio's known list automatically picks up the correct CT range. After the first successful connection, the real model reported by `info()` confirms protocol + range, and the slider clamps any out-of-range value to whatever the hardware actually supports.
+
+| Model ID | Device | Protocol | CT range | Source |
+|---|---|---|---|---|
+| `yeelink.light.lamp22` | Mi Smart Monitor Light Bar 1S (default model) | MIoT   | 2700–6500 K | python-miio specs.yaml |
+| `yeelink.light.lamp1`  | Mi LED Smart Desk Lamp (米家台灯)             | legacy | 2700–5000 K | python-miio specs.yaml |
+| `yeelink.light.lamp2`  | Mi Smart LED Desk Lamp Pro (米家台灯 Pro)     | legacy | 2500–4800 K | project override (not in specs.yaml) |
+| `yeelink.light.lamp4`  | Mi LED Desk Lamp 1S (米家台灯 1S)             | legacy | 2600–5000 K | python-miio specs.yaml |
+
+Any Yeelight device not listed here but present in python-miio's specs.yaml picks up its CT range automatically; otherwise it falls back to 2700–6500 K. If your model is MIoT and not yet covered, you need to add the `(siid, piid)` mapping to `_MIOT_MAPPINGS` — otherwise it'll be treated as legacy.
+
+> **When filing a compatibility issue, include the `model` field** (e.g. `yeelink.light.lamp22`) — it pins down the protocol and CT range. You can read it from `device.model` in `%APPDATA%\MiMonitorLightTray\config.json`, or run `miiocli device --ip <IP> --token <token> info`.
 
 ## Features
 
@@ -26,6 +39,9 @@ Any Xiaomi / Yeelight tunable-white light that speaks the standard Yeelight miio
 - **First-run wizard** — IP/Token capture with a built-in **Test connection** button
 - **Persistent config** — atomic write to `%APPDATA%\MiMonitorLightTray\config.json`
 - **No install required** — single-file EXE, no Python on the target machine
+- **Light follows the app** — two independent toggles: power on at app startup, power off at app exit
+- **Auto-power-on while dragging sliders** — if the light is off when you move the brightness/CT slider, the app powers it on first so the change is visible
+- **Experimental MIoT toggle** — for newer Yeelight devices not yet in the MIoT whitelist, try MIoT manually from the settings dialog
 
 ## Install
 
@@ -94,14 +110,14 @@ Click **Test connection** to verify, then **Save**. The token is written **local
 ### (Optional) verify connectivity by hand
 
 ```python
-from miio import Yeelight
+from miio import Device
 
-light = Yeelight(ip="192.168.1.xxx", token="your-32-char-token")
-status = light.status()
-print(f"Power: {'on' if status.is_on else 'off'}")
-print(f"Brightness: {status.brightness}%")
-print(f"Color temp: {status.color_temp}K")
+dev = Device(ip="192.168.1.xxx", token="your-32-char-token")
+info = dev.info()
+print(f"Connected: model={info.model} firmware={info.firmware_version}")
 ```
+
+`Device.info()` is a protocol-layer command and works for both legacy Yeelight and MIoT devices. Property reads/writes after that need either the `Yeelight` or `MiotDevice` subclass — the app picks one automatically per model, you don't need to choose manually.
 
 ## Usage
 
@@ -119,6 +135,23 @@ print(f"Color temp: {status.color_temp}K")
 ### Run at startup
 
 Open **设置** (Settings) and tick "开机自启动" (Run at startup), or use the same item in the tray right-click menu. This writes a `MiMonitorLightTray` entry to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` — current-user only, no admin required.
+
+### Light follows the app
+
+Two independent toggles in the settings dialog and in the tray right-click menu:
+
+- **灯跟随软件启动** — power the light **on** when the app starts
+- **灯跟随软件关闭** — power the light **off** when the app exits (tray "退出", `Ctrl+C`, taskbar close, etc.)
+
+Either can be enabled alone; combined with system autostart they give you "power on the PC → light on, shut down → light off". The exit-off path registers an `atexit` handler so it also covers exit routes that bypass the tray menu.
+
+### Auto-power-on while dragging sliders
+
+When the light is currently off and you move the brightness or CT slider, the app sends a power-on command first, then the target value. This is on by default and not configurable — it avoids the "dragging seems to do nothing" confusion (legacy Yeelight's auto-on behavior is firmware-dependent, and MIoT lights never auto-on).
+
+### Enable MIoT (experimental)
+
+`_MIOT_MAPPINGS` is the whitelist of known MIoT devices. If your device is a newer Yeelight model that isn't in the whitelist but you suspect it actually speaks MIoT, tick **"启用 MIoT（实验性）"** in the settings dialog. The app then attempts to talk to it using lamp22's generic Light-service spec (`(siid=2, piid=1/2/3) = power/brightness/color-temperature`). This is a calculated gamble — most Mi/Yeelight monitor lights and desk lamps follow that layout, but compatibility isn't guaranteed. If the device doesn't respond, errors will pile up; untick the box to fall back to legacy.
 
 ### Command-line flags
 
@@ -151,7 +184,7 @@ Coverage: config serialization ([tests/test_config.py](tests/test_config.py)), t
 mi_monitor_light_tray/
   __main__.py          entrypoint: single-instance lock → config → tray + flyout
   config.py            AppConfig / DeviceConfig persistence (atomic write)
-  miio_client.py       thread-safe Yeelight wrapper + slider Debouncer
+  miio_client.py       legacy Yeelight + MIoT protocol dispatch, thread-safe wrapper + slider Debouncer
   flyout.py            borderless Tk window with Canvas dark sliders
   icon.py              Pillow-generated tray icon (no binary assets)
   setup_wizard.py      IP/Token capture window with connection test
@@ -175,12 +208,15 @@ Location: `%APPDATA%\MiMonitorLightTray\config.json`
     "token": "...32 hex chars...",
     "name": "Mi Monitor Light",
     "model": "",
-    "device_id": 12345678
+    "device_id": 12345678,
+    "enable_miot_for_unknown": false,
+    "power_on_at_startup": false,
+    "power_off_at_exit": false
   }
 }
 ```
 
-`device_id` is captured automatically on the first successful connect and is what enables auto-rediscovery when the IP changes. Brightness and color temperature are remembered by the lamp itself; the launch-at-startup flag lives in the Windows registry, not here.
+`device_id` is captured automatically on the first successful connect and is what enables auto-rediscovery when the IP changes. `enable_miot_for_unknown` lets Yeelight devices outside the `_MIOT_MAPPINGS` whitelist try MIoT using lamp22's generic Light-service spec — for newer models that follow the same layout. `power_on_at_startup` / `power_off_at_exit` are two independent toggles that control whether the light follows the app's lifecycle. Brightness and color temperature are remembered by the lamp itself; the system-level launch-at-startup flag lives in the Windows registry, not here.
 
 ## Troubleshooting
 
@@ -201,6 +237,10 @@ Windows Explorer may have hidden it in the overflow area; click the up-arrow on 
 
 **Sliders feel ~0.1 s laggy while dragging**
 That's intentional debouncing (120 ms brightness / 180 ms color temperature) to avoid flooding the device. The final value commits as soon as you let go.
+
+## Roadmap
+
+- The supported-device table is community-driven — PRs adding verified entries are welcome (model id + protocol + CT range + recognisable device name). For MIoT devices you'll also need to add a `(siid, piid)` mapping to `_MIOT_MAPPINGS` in [miio_client.py](mi_monitor_light_tray/miio_client.py) — copy the existing `lamp22` block as a template.
 
 ## Acknowledgements
 

@@ -8,11 +8,24 @@
 
 ## 兼容设备
 
-支持所有使用标准 Yeelight miio 命令（`set_bright` / `set_ct_abx`）的小米白光可调灯，包括但不限于：
+本程序按设备 `model` **自动选择 legacy 或 MIoT 协议**：lamp22（显示器挂灯 1S）等新机型走 MIoT，[`(siid, piid)`](mi_monitor_light_tray/miio_client.py) 数字寻址；老一代台灯走 legacy（`set_bright` / `set_ct_abx`）。色温区间按以下顺序解析：
 
-- `yeelink.light.monitor1`（小米显示器挂灯，默认型号）
-- `yeelink.light.monitor2`
-- `yeelink.light.lamp22` 等其他 Yeelight WiFi 白光灯
+1. 本项目的 [`MODEL_CT_RANGES`](mi_monitor_light_tray/miio_client.py) 覆盖表（极少数特例）；
+2. **python-miio 自带的 `specs.yaml` 数据库**（约 40 个 Yeelight 机型，本项目直接复用 `YeelightSpecHelper`，不需要我们维护）；
+3. 保守默认 `2700–6500 K`。
+
+下表只列重点机型；任何在 python-miio 已知列表里的 Yeelight 设备都会自动拿到正确的色温区间。首次连接后由 `info()` 报告的真实 `model` 自动确认协议与范围，超出范围的滑杆值会被夹到设备实际支持的区间。
+
+| 型号 ID | 设备 | 协议 | 色温范围 | 范围来源 |
+|---|---|---|---|---|
+| `yeelink.light.lamp22` | 米家智能显示器挂灯 1S（默认型号） | MIoT   | 2700–6500 K | python-miio specs.yaml |
+| `yeelink.light.lamp1`  | 米家台灯                          | legacy | 2700–5000 K | python-miio specs.yaml |
+| `yeelink.light.lamp2`  | 米家台灯 Pro                      | legacy | 2500–4800 K | 项目覆盖表（specs.yaml 未收录） |
+| `yeelink.light.lamp4`  | 米家台灯 1S                       | legacy | 2600–5000 K | python-miio specs.yaml |
+
+未列出的 Yeelight 设备如果在 python-miio 的 specs.yaml 里能查到，色温区间自动套用；否则回落到 2700–6500 K。如果你手上的新机型是 MIoT 设备且未被列入，需要把 `(siid, piid)` 映射加进 `_MIOT_MAPPINGS`，否则会按 legacy 处理。
+
+> **反馈兼容性问题时请带上 `model` 字段**（例如 `yeelink.light.lamp22`），这是定位设备协议、色温区间的关键信息。可在配置文件 `%APPDATA%\MiMonitorLightTray\config.json` 的 `device.model` 看到，或者用 `miiocli device --ip <IP> --token <token> info` 查。
 
 ## 特性
 
@@ -26,6 +39,9 @@
 - **首次运行向导** — 内置 IP/Token 配置界面，含"测试连接"按钮
 - **持久化配置** — 保存到 `%APPDATA%\MiMonitorLightTray\config.json`，原子写入
 - **免安装** — 提供单文件 EXE，无需 Python 环境
+- **灯跟随软件启动/关闭** — 可选；程序启动时自动开灯、退出时自动关灯（两个独立开关）
+- **拖滑杆自动开灯** — 灯处于关闭状态时拖动亮度/色温，会先开灯再生效，避免"白拖一通"
+- **MIoT 实验开关** — 对未被白名单收录的新型 Yeelight 设备，可在设置里手动启用 MIoT 协议尝试
 
 ## 安装
 
@@ -94,14 +110,14 @@ miiocli cloud
 ### （可选）手动验证连接
 
 ```python
-from miio import Yeelight
+from miio import Device
 
-light = Yeelight(ip="192.168.1.xxx", token="你的32位token")
-status = light.status()
-print(f"状态: {'开' if status.is_on else '关'}")
-print(f"亮度: {status.brightness}%")
-print(f"色温: {status.color_temp}K")
+dev = Device(ip="192.168.1.xxx", token="你的32位token")
+info = dev.info()
+print(f"连接成功: model={info.model} firmware={info.firmware_version}")
 ```
+
+`Device.info()` 是协议层命令，legacy 与 MIoT 设备都支持。后续的属性读写需要按设备 model 走对应的 `Yeelight` 或 `MiotDevice` 接口 —— 本程序内部已经按 model 自动分发，普通使用不需要手动区分。
 
 ## 使用
 
@@ -117,6 +133,23 @@ print(f"色温: {status.color_temp}K")
 ### 开机自启动
 
 打开 **设置** 窗口勾选"开机自启动"，或者在托盘**右键菜单**点击"开机自启动"切换。本质是向 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 写一条 `MiMonitorLightTray`，不需要管理员权限，只对当前用户生效。
+
+### 灯跟随软件启动 / 关闭
+
+设置窗口或托盘右键菜单都能勾选以下两个独立开关：
+
+- **灯跟随软件启动** — 程序启动时自动开灯
+- **灯跟随软件关闭** — 程序退出（含点托盘菜单"退出"、`Ctrl+C`、任务栏关闭）时自动关灯
+
+两个开关相互独立，可以单独勾选。和"开机自启动"组合使用就能做到"开机 → 灯亮，关机 → 灯灭"。退出关灯走 `atexit` 钩子兜底，覆盖非托盘"退出"的退出路径。
+
+### 拖滑杆自动开灯
+
+当灯处于关闭状态时拖动亮度或色温滑杆，程序会**先发送开灯指令，再设置目标值**。这是默认行为、无需开关 — 避免出现"拖了半天没反应"的困惑（legacy Yeelight 的自动开灯由固件决定，MIoT 协议则完全不会自动开）。
+
+### 启用 MIoT（实验性）
+
+`_MIOT_MAPPINGS` 是已知 MIoT 设备的白名单。如果你手上是新型 Yeelight 设备、不在白名单里、又怀疑它实际走 MIoT 协议，可以在 **设置** 里勾选"启用 MIoT（实验性）"，程序会用 lamp22 的通用 Light service spec（`(siid=2, piid=1/2/3) = power/brightness/color-temperature`）尝试与设备通信。这是一个赌注 — Mi/Yeelight 监视器灯/台灯多数遵循这个布局，但不保证所有设备如此。设备不兼容时会持续报错；关掉这个开关即可回到 legacy 路径。
 
 ### 命令行参数
 
@@ -149,7 +182,7 @@ pytest -q
 mi_monitor_light_tray/
   __main__.py          入口：单例锁 → 加载配置 → 启动托盘与弹窗
   config.py            AppConfig / DeviceConfig 持久化（原子写入）
-  miio_client.py       Yeelight 同步线程安全包装 + Debouncer 防抖
+  miio_client.py       legacy Yeelight + MIoT 协议分发，线程安全包装 + Debouncer 防抖
   flyout.py            Tk 无边框弹窗 + Canvas 实现的暗色滑杆
   icon.py              Pillow 程序化绘制托盘图标（无二进制资源）
   setup_wizard.py      IP/Token 配置向导，含测试连接
@@ -173,12 +206,15 @@ tests/                 pytest 单元测试套件
     "token": "...32 位十六进制...",
     "name": "显示器挂灯",
     "model": "",
-    "device_id": 12345678
+    "device_id": 12345678,
+    "enable_miot_for_unknown": false,
+    "power_on_at_startup": false,
+    "power_off_at_exit": false
   }
 }
 ```
 
-`device_id` 在首次连接成功时自动捕获，用于 IP 变化后的自动发现。亮度/色温由挂灯自己记忆；开机自启动状态由 Windows 注册表保存，不在此文件里。
+`device_id` 在首次连接成功时自动捕获，用于 IP 变化后的自动发现。`enable_miot_for_unknown` 让未在 `_MIOT_MAPPINGS` 白名单里的 Yeelight 设备也走 MIoT 协议（用 lamp22 的通用 Light service spec 探测），适合新机型；`power_on_at_startup` / `power_off_at_exit` 两个独立开关控制程序启停时是否自动开/关灯。亮度/色温由挂灯自己记忆；开机自启动（Windows 系统层面的）状态由注册表保存，不在此文件里。
 
 ## 常见问题
 
@@ -200,6 +236,10 @@ A：Windows 资源管理器可能把它收进了溢出区，点击托盘左侧�
 
 **Q：拖滑杆时灯有约 0.1 秒延迟**
 A：这是有意的防抖（120ms 亮度 / 180ms 色温），用来合并请求避免设备被刷爆，松开手后会立即生效。
+
+## Roadmap
+
+- 兼容设备表欢迎社区按真实设备 PR 补充（型号 ID + 协议 + 色温范围 + 实测的设备名称）。新增 MIoT 设备时除了在 `MODEL_CT_RANGES` 加一行，还要在 `_MIOT_MAPPINGS` 里加一份 `(siid, piid)` 映射 —— 模板见 [miio_client.py](mi_monitor_light_tray/miio_client.py) 顶部。
 
 ## 致谢
 
