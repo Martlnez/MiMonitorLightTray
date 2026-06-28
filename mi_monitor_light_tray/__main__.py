@@ -67,6 +67,7 @@ class App:
             device_id=config.device.device_id,
             on_ip_changed=self._on_ip_changed,
             on_range_changed=self._on_ct_range_changed,
+            on_model_resolved=self._on_model_resolved,
             enable_miot_for_unknown=config.device.enable_miot_for_unknown,
         )
 
@@ -75,6 +76,13 @@ class App:
         if self._config.device.power_on_at_startup:
             import threading
             threading.Thread(target=self._startup_power_on, daemon=True).start()
+        elif not self._config.device.model or self._config.device.device_id == 0:
+            # No power-on at startup, but we still need at least one refresh so
+            # device_id and model get captured into config. Avoids the silent
+            # "I never get persisted" trap when the user leaves model="" but
+            # never opens the flyout.
+            import threading
+            threading.Thread(target=self._light.refresh, daemon=True).start()
         try:
             self._flyout.run()
         finally:
@@ -157,6 +165,17 @@ class App:
         """Called from a worker thread once info() resolves the model — push to UI."""
         self._flyout.schedule_apply_ct_range(lo, hi)
 
+    def _on_model_resolved(self, model: str) -> None:
+        """Persist an auto-detected model to config (worker thread)."""
+        if not model or model == self._config.device.model:
+            return
+        log.info("Auto-detected model %s; saving to config", model)
+        self._config.device.model = model
+        try:
+            self._config.save()
+        except OSError as exc:
+            log.warning("Failed to save resolved model: %s", exc)
+
     def _open_settings(self) -> None:
         # Tk doesn't allow opening a second Tk root from another thread; route
         # through the flyout's Tk loop with after(0) so the wizard is created
@@ -185,13 +204,20 @@ class App:
             self._light.color_temp_min, self._light.color_temp_max
         )
         self._tray.set_title(config.device.name or "Mi Monitor Light")
-        # Trigger a refresh to capture device_id if not already saved.
-        if config.device.device_id == 0:
+        # Trigger a refresh to capture device_id and/or model if missing —
+        # _on_model_resolved handles model persistence; we still need this
+        # thread to backfill device_id, which has no listener.
+        if config.device.device_id == 0 or not config.device.model:
             import threading
             threading.Thread(target=self._initial_refresh, daemon=True).start()
 
     def _initial_refresh(self) -> None:
-        """Refresh device state and save device_id to config if newly captured."""
+        """Refresh device state and save device_id to config if newly captured.
+
+        Model persistence is handled by ``_on_model_resolved`` (fired from
+        within the light's _record_success when auto-detect runs); this method
+        only covers device_id, which has no callback hook.
+        """
         self._light.refresh()
         if self._light.device_id > 0 and self._config.device.device_id == 0:
             self._config.device.device_id = self._light.device_id

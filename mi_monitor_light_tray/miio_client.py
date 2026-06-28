@@ -287,14 +287,23 @@ class MiMonitorLight:
         device_id: int = 0,
         on_ip_changed: Optional[Callable[[str], None]] = None,
         on_range_changed: Optional[Callable[[int, int], None]] = None,
+        on_model_resolved: Optional[Callable[[str], None]] = None,
         enable_miot_for_unknown: bool = False,
     ) -> None:
         self._ip = ip
         self._token = token
         self._model = model or self.DEFAULT_MODEL
+        # If the caller passed a non-empty model, treat it as authoritative —
+        # info() may report something different at runtime (e.g. the user is
+        # forcing a model for testing or working around a mis-detected
+        # firmware), and silently overwriting their config would be surprising.
+        # Blank model → auto-detect from info() as before, and fire
+        # on_model_resolved so the caller can persist the captured value.
+        self._model_locked = bool(model)
         self._device_id = device_id
         self._on_ip_changed = on_ip_changed
         self._on_range_changed = on_range_changed
+        self._on_model_resolved = on_model_resolved
         self._enable_miot_for_unknown = enable_miot_for_unknown
         self._lock = threading.Lock()
         self._device = _make_backend(
@@ -413,22 +422,29 @@ class MiMonitorLight:
             if not isinstance(reported, str):
                 reported = ""
             if reported and reported != self._model:
-                log.info("Device model reported as %s (was %s)", reported, self._model)
-                self._model = reported
-                # The reported model may need a different protocol than what we
-                # started with. Swap the backend if the protocol family differs.
-                current_is_miot = isinstance(self._device, _MiotBackend)
-                target_is_miot = reported in _MIOT_MAPPINGS
-                if current_is_miot != target_is_miot:
+                if self._model_locked:
+                    # Honor the user's explicit config choice — only log it.
                     log.info(
-                        "Switching backend to %s for model %s",
-                        "MIoT" if target_is_miot else "legacy",
-                        reported,
+                        "Device reports model %s but config locks model to %s; honoring config",
+                        reported, self._model,
                     )
-                    self._device = _make_backend(
-                        self._ip, self._token, reported,
-                        enable_miot_for_unknown=self._enable_miot_for_unknown,
-                    )
+                else:
+                    log.info("Device model reported as %s (was %s)", reported, self._model)
+                    self._model = reported
+                    # The reported model may need a different protocol than what we
+                    # started with. Swap the backend if the protocol family differs.
+                    current_is_miot = isinstance(self._device, _MiotBackend)
+                    target_is_miot = reported in _MIOT_MAPPINGS
+                    if current_is_miot != target_is_miot:
+                        log.info(
+                            "Switching backend to %s for model %s",
+                            "MIoT" if target_is_miot else "legacy",
+                            reported,
+                        )
+                        self._device = _make_backend(
+                            self._ip, self._token, reported,
+                            enable_miot_for_unknown=self._enable_miot_for_unknown,
+                        )
             new_range = self.ct_range_for(self._model)
             if new_range != (self._color_temp_min, self._color_temp_max):
                 self._color_temp_min, self._color_temp_max = new_range
@@ -445,6 +461,17 @@ class MiMonitorLight:
                         callback(self._color_temp_min, self._color_temp_max)
                     except Exception:  # noqa: BLE001
                         log.exception("on_range_changed listener raised")
+            # Fire on_model_resolved exactly once per session when auto-detect
+            # took the wheel (locked configs never broadcast — the user is the
+            # source of truth there). Caller persists the value to config so
+            # future startups skip the detection round-trip.
+            if not self._model_locked and reported:
+                callback = self._on_model_resolved
+                if callback is not None:
+                    try:
+                        callback(self._model)
+                    except Exception:  # noqa: BLE001
+                        log.exception("on_model_resolved listener raised")
             self._model_resolved = True
 
     def refresh(self) -> LightState:
@@ -521,6 +548,41 @@ class MiMonitorLight:
                 self._record_error(exc, "set_color_temp")
         self._notify()
         return value
+
+
+# Bulk-imported MIoT data from miot-spec.org, generated by
+# scripts/distill_miot_specs.py. The bulk data is treated CONSERVATIVELY:
+#
+# * **CT ranges** — always merged (just refines slider bounds; harmless on
+#   any device). Curated entries above and python-miio's YeelightSpecHelper
+#   still win on precedence.
+# * **MIoT mappings** — *intentionally not bulk-imported*. Many Mi/Yeelight
+#   devices publish a MIoT spec but also speak the legacy Yeelight protocol;
+#   routing them to MIoT just because a spec exists would flip working devices
+#   onto an unverified path. Devices that genuinely require MIoT must either:
+#     (a) be in the curated ``_MIOT_MAPPINGS`` above, or
+#     (b) be unlocked by the user's ``enable_miot_for_unknown`` flag, which
+#         tries the generic Light-service spec.
+#
+# Import is optional: if ``_miot_data`` doesn't exist (user hasn't run the
+# scrape), the curated dicts stand alone.
+try:
+    from . import _miot_data  # type: ignore[attr-defined]
+except ImportError:
+    pass
+else:
+    _legacy_known = set(_SPEC_HELPER.supported_models)
+    _bulk_added_ranges = 0
+    for _model, _range in getattr(_miot_data, "MIOT_CT_RANGES", {}).items():
+        if (_model in MiMonitorLight.MODEL_CT_RANGES
+                or _model in _legacy_known):
+            continue
+        MiMonitorLight.MODEL_CT_RANGES[_model] = tuple(_range)
+        _bulk_added_ranges += 1
+    log.info(
+        "Loaded MIoT bulk data: +%d CT ranges (mappings stay curated)",
+        _bulk_added_ranges,
+    )
 
 
 class Debouncer:

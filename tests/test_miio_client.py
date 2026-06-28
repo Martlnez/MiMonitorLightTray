@@ -426,3 +426,93 @@ def test_flag_off_keeps_legacy_for_unknown(fake_yeelight, fake_miot):
     )
     assert isinstance(light._device, miio_client._LegacyBackend)
     fake_miot.assert_not_called()
+
+
+# ── user-locked model (config override stays authoritative) ───────────────────
+
+
+def test_explicit_model_locks_against_info_overwrite(fake_yeelight):
+    """User-set model must survive even if info() reports a different one.
+
+    Scenario: user manually wrote ``model=yeelink.light.lamp2`` into config to
+    test the narrower 2500-4800K range. The actual device reports back as
+    lamp22 (2700-6500K). Honoring info() would silently snap the slider back to
+    the wider range and confuse the user — see issue noted in the README.
+    """
+    device = MagicMock()
+    device.set_color_temp = MagicMock(return_value=None)
+    # Real device reports a *different* model than what the user configured.
+    device.info = MagicMock(return_value=MagicMock(model="yeelink.light.lamp22"))
+    fake_yeelight.return_value = device
+    range_callbacks: list[tuple[int, int]] = []
+    model_callbacks: list[str] = []
+    light = miio_client.MiMonitorLight(
+        ip="1.2.3.4", token="t" * 32,
+        model="yeelink.light.lamp2",
+        on_range_changed=lambda lo, hi: range_callbacks.append((lo, hi)),
+        on_model_resolved=lambda m: model_callbacks.append(m),
+    )
+    # Pre-info() state: range comes from MODEL_CT_RANGES override for lamp2.
+    assert light.model == "yeelink.light.lamp2"
+    assert (light.color_temp_min, light.color_temp_max) == (2500, 4800)
+
+    # Trigger the success path → info() reports lamp22; we must IGNORE it.
+    light.set_color_temp(3000)
+    assert light.model == "yeelink.light.lamp2"  # NOT overwritten
+    assert (light.color_temp_min, light.color_temp_max) == (2500, 4800)
+    # No range change → no callback fired.
+    assert range_callbacks == []
+    # And critically: the model-resolved callback must NOT fire when locked —
+    # otherwise we'd silently persist the wrong value over the user's choice.
+    assert model_callbacks == []
+
+
+def test_blank_model_auto_resolves_and_fires_callback(fake_yeelight, fake_miot):
+    """Blank model in config → info() resolves → on_model_resolved fires once.
+
+    This is the persistence path: caller writes the captured model to config so
+    subsequent startups skip the round-trip.
+    """
+    device = MagicMock()
+    device.set_brightness = MagicMock(return_value=None)
+    device.info = MagicMock(return_value=MagicMock(model="yeelink.light.lamp4"))
+    # Default model lamp22 routes to MIoT; we'll override with the lamp4 reply.
+    fake_miot.return_value = device
+    fake_yeelight.return_value = device
+    resolved: list[str] = []
+    light = miio_client.MiMonitorLight(
+        ip="1.2.3.4", token="t" * 32,
+        model="",  # blank — let auto-detect take over
+        on_model_resolved=lambda m: resolved.append(m),
+    )
+    # Starts as default (lamp22, MIoT backend).
+    assert light.model == "yeelink.light.lamp22"
+    light.set_brightness(50)
+    # info() reported lamp4, so the resolver should swap us to lamp4 / legacy.
+    assert light.model == "yeelink.light.lamp4"
+    assert (light.color_temp_min, light.color_temp_max) == (2600, 5000)
+    # Callback fired exactly once with the resolved model.
+    assert resolved == ["yeelink.light.lamp4"]
+    # Second op must NOT re-fire — model_resolved is sticky.
+    light.set_brightness(60)
+    assert resolved == ["yeelink.light.lamp4"]
+
+
+def test_blank_model_still_auto_resolves(fake_yeelight, fake_miot):
+    """Sanity: when the user leaves model="" in config, info() auto-detect still works."""
+    device = MagicMock()
+    device.set_brightness = MagicMock(return_value=None)
+    device.info = MagicMock(return_value=MagicMock(model="yeelink.light.lamp4"))
+    # Default model lamp22 routes to MIoT; we'll override with the lamp4 reply.
+    fake_miot.return_value = device
+    fake_yeelight.return_value = device
+    light = miio_client.MiMonitorLight(
+        ip="1.2.3.4", token="t" * 32,
+        model="",  # blank — let auto-detect take over
+    )
+    # Starts as default (lamp22, MIoT backend).
+    assert light.model == "yeelink.light.lamp22"
+    light.set_brightness(50)
+    # info() reported lamp4, so the resolver should swap us to lamp4 / legacy.
+    assert light.model == "yeelink.light.lamp4"
+    assert (light.color_temp_min, light.color_temp_max) == (2600, 5000)
