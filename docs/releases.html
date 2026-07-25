@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发布说明 — Mi Monitor Light Tray</title>
+<meta name="description" content="Mi Monitor Light Tray 版本更新历史与 Release Notes。">
+<link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+            <span class="nav-logo-icon">⏻</span>
+            <span>Mi Monitor Light Tray</span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html">首页</a></li>
+            <li><a href="guide.html">使用文档</a></li>
+            <li><a href="releases.html">发布说明</a></li>
+        </ul>
+        <a href="https://github.com/Martlnez/MiMonitorLightTray" class="nav-github" target="_blank" rel="noopener">GitHub</a>
+    </div>
+</nav>
+
+<main class="page-main">
+
+<section class="hero" style="padding: 20px 0 40px;">
+    <h1 style="font-size: clamp(32px, 5vw, 48px); margin-bottom: 12px;">发布说明</h1>
+    <p class="hero-sub" style="margin-bottom: 24px;">
+        版本更新历史。完整变更日志在 <a href="https://github.com/Martlnez/MiMonitorLightTray/releases" target="_blank" rel="noopener">GitHub Releases</a>。
+    </p>
+    <a class="btn btn-primary" data-download href="https://github.com/Martlnez/MiMonitorLightTray/releases/latest" target="_blank" rel="noopener">
+        <span>⬇</span>
+        <span>下载最新版</span>
+        <span class="btn-size"></span>
+    </a>
+</section>
+
+<article class="release release-latest">
+    <div class="release-header">
+        <h2>v1.5.0 · 多灯并行管理</h2>
+        <span class="release-tag">● 当前版本</span>
+    </div>
+    <p class="release-date">2026-07 发布</p>
+    <div class="release-body">
+        <p>一次围绕 <strong>多灯并行管理</strong> 的大重构。核心从"一个实例控制一盏灯"升级为"一个实例控制任意多盏灯，每盏独立配置、独立控制"。</p>
+
+        <h3>✨ 新功能 · 多灯连接</h3>
+        <ul>
+            <li><strong>无上限的设备数量</strong> — 一个实例可同时管理任意多盏米家 / Yeelight 灯，共享一份托盘图标、一份弹窗、一份快捷键路由</li>
+            <li><strong>图形化设备列表</strong> — 全新的设置界面，卡片式展示每盏灯的名称 / IP / 型号 / 状态；支持添加、编辑、删除</li>
+            <li><strong>拖拽排序</strong> — 按住每张卡片左侧的 <code>⋮⋮</code> 图标即可拖动，顺序决定弹窗中的显示位置</li>
+            <li><strong>云端一键多选导入</strong> — 扫码登录小米账号后可勾选多盏设备，一次性批量添加，Token 全部自动填入</li>
+            <li><strong>配置自动迁移</strong> — 从 v1.4.x 升级时，旧的顶层 <code>device</code> 单对象会被无感转换为 <code>devices: [...]</code> 数组</li>
+        </ul>
+
+        <h3>✨ 新功能 · 弹窗重构</h3>
+        <ul>
+            <li><strong>每设备一节</strong> — 弹窗按设备列表顺序为每盏灯渲染独立的一节：设备名、状态、⏻ 开关按钮、亮度 / 色温滑杆</li>
+            <li><strong>窗口高度自适应</strong> — 一盏灯与旧版差不多，两盏灯约翻倍高，以此类推</li>
+            <li><strong>关闭所有灯一键按钮</strong> — 底部新增 ⏻ 按钮，一次关掉所有在线设备</li>
+            <li><strong>设备名智能截断</strong> — 名称过长时自动截断为 <code>xxxx...</code>，按钮位置保持固定</li>
+            <li><strong>每设备独立防抖器</strong> — 多盏灯拖滑杆时互不干扰</li>
+        </ul>
+
+        <h3>✨ 新功能 · 每设备独立配置</h3>
+        <ul>
+            <li>五项电源策略独立开关：软件启停、显示器休眠、系统休眠 / 唤醒</li>
+            <li>两项显示控制：亮度 / 色温滑杆的可见性</li>
+            <li>四个全局快捷键：亮度 +/-、色温 +/-，以及独立的调整步进值</li>
+            <li>快捷键<strong>在输入框内按下即捕获</strong>；<strong>右键输入框直接清空</strong></li>
+        </ul>
+
+        <h3>🐛 修复</h3>
+        <ul>
+            <li>设置页"检查更新"按钮走完整的托盘菜单同款流程（含"已是最新版本"弹窗、缓存更新、菜单刷新徽标）</li>
+            <li>恢复了 v1.4.3 的按键捕获实现（<code>event.state</code> 位掩码解析 + 特殊键 keysym 映射），并接到每设备 hotkey_manager 上</li>
+            <li>修正 <code>_on_config_saved</code> 保存后重建的灯回调签名（<code>(state)</code> → <code>(state, device_id)</code>）</li>
+            <li>清理弹窗遗留的 <code>self._light</code> 引用，色温 clamp 时不再报 <code>AttributeError</code></li>
+        </ul>
+
+        <h3>⚠️ 已知限制</h3>
+        <ul>
+            <li><strong>桌面小部件仍为单设备</strong> — 只显示配置里第一盏灯的滑杆，多设备场景请用托盘弹窗或快捷键</li>
+            <li>托盘右键菜单里的 5 个电源策略开关是"任一为真视为开"的聚合视图</li>
+            <li>顶层 <code>hotkey</code> 段被废弃，v1.5+ 使用每设备快捷键</li>
+        </ul>
+    </div>
+    <div class="release-actions">
+        <a class="btn btn-primary btn-sm" data-download href="https://github.com/Martlnez/MiMonitorLightTray/releases/latest" target="_blank" rel="noopener">下载 EXE</a>
+        <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/releases/tag/v1.5.0" target="_blank" rel="noopener">GitHub Release</a>
+        <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/compare/v1.4.3...v1.5.0" target="_blank" rel="noopener">Compare</a>
+    </div>
+</article>
+
+<article class="release">
+    <div class="release-header">
+        <h2>v1.4.3 · 电源事件监听</h2>
+        <span class="release-tag" style="background: var(--bg-tertiary); color: var(--text-muted);">2026-07</span>
+    </div>
+    <div class="release-body">
+        <h3>✨ 新功能</h3>
+        <ul>
+            <li><strong>灯随显示器休眠开关</strong> — Windows 关闭显示器时灯自动关，唤醒时恢复到关闭前的状态</li>
+            <li><strong>系统休眠时关灯</strong> — 电脑进入睡眠 / 休眠时自动关灯</li>
+            <li><strong>系统唤醒时开灯</strong> — 电脑从睡眠 / 休眠恢复时自动开灯</li>
+            <li>三个独立开关，可根据需要自由组合</li>
+        </ul>
+        <h3>🐛 修复</h3>
+        <ul>
+            <li>修正 <code>GUID_MONITOR_POWER_ON</code>（Win8 已废弃）改用 <code>GUID_CONSOLE_DISPLAY_STATE</code>，Modern Standby 系统也能触发</li>
+            <li>移除 55 秒空闲判断，避免播放视频时误关灯</li>
+            <li>使用顶级窗口而非 <code>HWND_MESSAGE</code>，确保能收到系统级广播</li>
+            <li>调用 <code>RegisterSuspendResumeNotification</code> 显式订阅休眠事件</li>
+        </ul>
+    </div>
+    <div class="release-actions">
+        <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/releases/tag/v1.4.3" target="_blank" rel="noopener">GitHub Release</a>
+    </div>
+</article>
+
+<article class="release">
+    <div class="release-header">
+        <h2>v1.4.2 · 快捷键清空</h2>
+        <span class="release-tag" style="background: var(--bg-tertiary); color: var(--text-muted);">2026-07</span>
+    </div>
+    <div class="release-body">
+        <h3>🐛 Bug 修复</h3>
+        <ul>
+            <li>在快捷键输入框上右键，可通过"清空快捷键"菜单禁用不需要的快捷键</li>
+        </ul>
+    </div>
+    <div class="release-actions">
+        <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/releases/tag/v1.4.2" target="_blank" rel="noopener">GitHub Release</a>
+    </div>
+</article>
+
+<article class="release">
+    <div class="release-header">
+        <h2>v1.4.1 · 全局快捷键 + 自动更新</h2>
+        <span class="release-tag" style="background: var(--bg-tertiary); color: var(--text-muted);">2026-07</span>
+    </div>
+    <div class="release-body">
+        <h3>🎮 全局快捷键</h3>
+        <p>使用系统级热键调节亮度和色温，全屏游戏中也能响应。支持长按连续调整、按键录入配置。</p>
+        <h3>🔔 自动更新检测</h3>
+        <p>启动时后台检查 GitHub Release，有新版本弹窗提示，可在托盘菜单手动检查或关闭。</p>
+    </div>
+    <div class="release-actions">
+        <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/releases/tag/v1.4.1" target="_blank" rel="noopener">GitHub Release</a>
+    </div>
+</article>
+
+<article class="release">
+    <div class="release-header">
+        <h2>更早版本</h2>
+    </div>
+    <div class="release-body">
+        <p>v1.4.0 之前的历史版本可以在 <a href="https://github.com/Martlnez/MiMonitorLightTray/releases" target="_blank" rel="noopener">GitHub Releases 页面</a> 查看，包括：</p>
+        <ul>
+            <li><strong>v1.4.0</strong> — 云端 Token 提取、桌面小部件（感谢 <a href="https://github.com/zengzoxiong" target="_blank" rel="noopener">@zengzoxiong</a> PR #1）</li>
+            <li><strong>v1.3.x</strong> — bulk MIoT 设备库（2100+ 机型）、CT 单位过滤、灯随软件启停</li>
+            <li><strong>v1.2.x</strong> — 开机自启动、Flyout 体验完善、多网卡广播</li>
+            <li><strong>v1.1.x / v1.0.x</strong> — 初期版本，基础托盘与滑杆功能</li>
+        </ul>
+    </div>
+</article>
+
+</main>
+
+<footer>
+    <div class="footer-links">
+        <a href="https://github.com/Martlnez/MiMonitorLightTray" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Martlnez/MiMonitorLightTray/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://github.com/Martlnez/MiMonitorLightTray/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="index.html">首页</a>
+    </div>
+    <div>MIT License · Made for the Xiaomi / Yeelight ecosystem</div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>
+

@@ -1,6 +1,6 @@
 # 小米显示器挂灯托盘控制器
 
-> English version: **[README_EN.md](README_EN.md)**
+> English version: **[README_EN.md](README_EN.md)** · 在线文档：**[Martlnez.github.io/MiMonitorLightTray](https://martlnez.github.io/MiMonitorLightTray/)**
 
 一款 Windows 系统托盘小工具，用类似 [Twinkle Tray](https://twinkletray.com/) 的弹出式滑杆，控制小米 / Yeelight 显示器挂灯及各类米家灯具的开关、亮度与色温。基于 [python-miio](https://github.com/rytilahti/python-miio) 与设备本地局域网通信，**不经过云端**。
 
@@ -224,6 +224,19 @@ pytest -q
 ```
 
 测试覆盖配置序列化（[tests/test_config.py](tests/test_config.py)）、托盘图标渲染（[tests/test_icon.py](tests/test_icon.py)）、miio 包装层与防抖器（[tests/test_miio_client.py](tests/test_miio_client.py)）。UI 与真实网络路径需要手动验证。
+
+## 在线文档站（GitHub Pages）
+
+[docs/](docs/) 目录是一个纯静态站点（无 Jekyll，靠 `.nojekyll` 跳过默认处理），包含：
+
+- [docs/index.html](docs/index.html) — 项目主页（特性介绍、UI 预览、下载按钮）
+- [docs/guide.html](docs/guide.html) — 完整使用文档
+- [docs/releases.html](docs/releases.html) — 版本发布说明
+- [docs/assets/](docs/assets/) — CSS / JS / 图标
+
+**首次启用**：Repo → Settings → Pages → Source 选 `Deploy from a branch`，Branch 选 `main` / `/docs`，保存后几十秒内 `https://martlnez.github.io/MiMonitorLightTray/` 就能访问。
+
+页面顶部下载按钮和版本号会通过 GitHub Releases API 自动填入最新版本，push 后不用手工同步版本号。
 
 ## 项目结构
 

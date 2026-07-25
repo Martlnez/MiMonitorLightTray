@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>使用文档 — Mi Monitor Light Tray</title>
+<meta name="description" content="Mi Monitor Light Tray 使用手册：安装、多灯配置、快捷键、电源策略、故障排除。">
+<link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+            <span class="nav-logo-icon">⏻</span>
+            <span>Mi Monitor Light Tray</span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html">首页</a></li>
+            <li><a href="guide.html">使用文档</a></li>
+            <li><a href="releases.html">发布说明</a></li>
+        </ul>
+        <a href="https://github.com/Martlnez/MiMonitorLightTray" class="nav-github" target="_blank" rel="noopener">GitHub</a>
+    </div>
+</nav>
+
+<main>
+<div class="doc-layout">
+
+<aside class="doc-toc">
+    <h4>目录</h4>
+    <ul>
+        <li><a href="#安装">安装</a></li>
+        <li><a href="#首次设置">首次设置</a></li>
+        <li><a href="#使用">日常使用</a></li>
+        <li><a href="#快捷键">全局快捷键</a></li>
+        <li><a href="#电源策略">电源策略</a></li>
+        <li><a href="#桌面小部件">桌面小部件</a></li>
+        <li><a href="#配置文件">配置文件</a></li>
+        <li><a href="#兼容设备">兼容设备</a></li>
+        <li><a href="#故障排除">故障排除</a></li>
+        <li><a href="#从源码构建">从源码构建</a></li>
+    </ul>
+</aside>
+
+<article class="doc-content">
+
+<h1>使用文档</h1>
+<p class="doc-lead">
+    覆盖从安装、多灯配置到快捷键与故障排除的完整流程。适用于 v1.5.0 及以后版本。
+</p>
+
+<h2 id="安装">安装</h2>
+
+<h3>方式一：下载 EXE（推荐）</h3>
+<p>从 <a href="https://github.com/Martlnez/MiMonitorLightTray/releases/latest" target="_blank" rel="noopener">最新 Release</a> 下载 <code>MiMonitorLightTray.exe</code>，双击运行即可。每次 push 到 <code>main</code> 与每个 tag 都会自动构建。</p>
+
+<h3>方式二：从源码运行</h3>
+<pre><code>git clone https://github.com/Martlnez/MiMonitorLightTray.git
+cd MiMonitorLightTray
+
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e .
+
+mi-monitor-light-tray</code></pre>
+<p>要求 Python 3.9+。</p>
+
+<h2 id="首次设置">首次设置</h2>
+
+<p>首次运行会自动打开设备列表向导。<strong>推荐流程</strong>（多设备一键导入）：</p>
+<ol>
+    <li>点击 <strong>云端导入</strong></li>
+    <li>用小米账号 / 米家 App 扫描弹出的二维码登录</li>
+    <li>在设备列表中<strong>勾选一个或多个</strong>灯具，点击 <strong>确认导入</strong></li>
+</ol>
+
+<div class="callout callout-success">
+    <div class="callout-icon">✓</div>
+    <div class="callout-body">
+        <p><strong>无云端传输</strong>：所有勾选的设备会带着 IP / Token / 型号自动进入设备列表。Token 仅写入本地 <code>%APPDATA%\MiMonitorLightTray\config.json</code>，不上传第三方服务器。</p>
+    </div>
+</div>
+
+<h3>手动添加设备</h3>
+<p>也可以点击 <strong>+ 添加设备</strong> 逐个填写：</p>
+<ul>
+    <li><strong>设备 IP</strong>：米家 App → 设备页面 → ⋮ → 更多设置 → 网络信息；或在路由器 DHCP 列表里找名称含 <code>yeelight</code> / <code>monitor</code> 的设备</li>
+    <li><strong>miio Token</strong>：32 位十六进制串，可用 <a href="https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor" target="_blank" rel="noopener">Xiaomi-cloud-tokens-extractor</a> 或 <code>miiocli cloud</code> 提取</li>
+    <li><strong>显示名称</strong>：随意，会显示在弹窗上方</li>
+    <li><strong>型号</strong>：留空即可，连接后自动识别</li>
+</ul>
+<p>点击 <strong>测试连接</strong> 验证连通性，<strong>保存</strong> 后设备加入列表。可以对已添加的设备执行 <strong>编辑</strong> / <strong>删除</strong>，或按住行首 <code>⋮⋮</code> 图标 <strong>拖拽</strong> 调整显示顺序 —— 顺序决定弹窗中每个设备的显示位置。</p>
+
+<h2 id="使用">日常使用</h2>
+
+<h3>托盘弹窗</h3>
+<ul>
+    <li><strong>左键单击</strong>托盘图标 → 在光标附近弹出控制窗</li>
+    <li>弹窗按设备列表顺序为每盏灯渲染一节：设备名 + 状态 + 独立 <strong>⏻</strong> 开关按钮，下方是亮度 / 色温滑杆</li>
+    <li>窗口高度<strong>按内容自适应</strong>：一盏灯与旧版差不多，两盏灯约翻倍高</li>
+    <li>底部按钮从右到左：<strong>⚙</strong> 打开设置、<strong>⏻</strong> 关闭所有在线灯</li>
+    <li>点击窗口外或按 <code>Esc</code> 关闭弹窗</li>
+    <li>设备名过长时自动截断为 <code>xxxx...</code>，按钮位置保持固定</li>
+</ul>
+
+<h3>右键托盘菜单</h3>
+<table>
+<thead><tr><th>菜单项</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>调整亮度</td><td>打开控制窗</td></tr>
+<tr><td>桌面小部件</td><td>切换桌面小部件显示（当前小部件绑定第一盏灯）</td></tr>
+<tr><td>设置</td><td>打开设备列表管理器</td></tr>
+<tr><td>开机自启动</td><td>开关开机自启动</td></tr>
+<tr><td>灯跟随软件启动</td><td>聚合视图，若任一设备启用视为开</td></tr>
+<tr><td>灯跟随软件关闭</td><td>聚合视图，若任一设备启用视为开</td></tr>
+<tr><td>灯随显示器休眠开关</td><td>聚合视图</td></tr>
+<tr><td>系统休眠时关灯</td><td>聚合视图</td></tr>
+<tr><td>系统唤醒时开灯</td><td>聚合视图</td></tr>
+<tr><td>检查更新</td><td>手动检查 GitHub Release 新版本</td></tr>
+<tr><td>启动时自动检查更新</td><td>开关自动更新检测</td></tr>
+<tr><td>访问 GitHub 主页</td><td>浏览器打开项目主页</td></tr>
+<tr><td>退出</td><td>关闭程序</td></tr>
+</tbody>
+</table>
+
+<div class="callout callout-info">
+    <div class="callout-icon">ℹ</div>
+    <div class="callout-body">
+        <p>托盘菜单里几个"聚合视图"的开关是<strong>任一为真视为开</strong>的展示。想逐灯精确设置，请到 <strong>设置 → 编辑设备</strong> 里对每盏灯单独勾选。</p>
+    </div>
+</div>
+
+<h3>每设备显示控制</h3>
+<p>在 <strong>设置</strong> 界面的设备卡片上可以直接勾选 / 取消：</p>
+<ul>
+    <li><strong>显示亮度调节</strong> — 是否在弹窗中显示此设备的亮度滑杆</li>
+    <li><strong>显示色温调节</strong> — 是否在弹窗中显示此设备的色温滑杆</li>
+</ul>
+<p>两个开关都关掉时，该设备<strong>不会出现在弹窗里</strong>（快捷键仍生效）—— 适合"只想快捷键控制、不想在弹窗里看到"的辅助灯。</p>
+
+<h2 id="快捷键">全局快捷键</h2>
+
+<p>在 <strong>设置 → 编辑设备</strong> 底部的"快捷键设置"里，为每盏灯单独绑定：</p>
+<ol>
+    <li><strong>点击</strong>快捷键输入框</li>
+    <li><strong>按下</strong>想要的按键组合（如 <code>Ctrl+Alt+Up</code>）</li>
+    <li>输入框自动填充，可再次修改</li>
+    <li><strong>右键</strong>输入框直接清空</li>
+    <li>设置调整步进（默认 5，亮度按 1–100 直加减，色温按范围百分比换算）</li>
+    <li>保存</li>
+</ol>
+
+<p><strong>可用修饰键</strong>：Ctrl、Shift、Alt、Win</p>
+<p><strong>推荐组合示例</strong>：</p>
+<ul>
+    <li>亮度增加：<code>Ctrl+Alt+Up</code></li>
+    <li>亮度降低：<code>Ctrl+Alt+Down</code></li>
+    <li>色温增加：<code>Ctrl+Alt+Right</code>（偏冷白）</li>
+    <li>色温降低：<code>Ctrl+Alt+Left</code>（偏暖白）</li>
+</ul>
+
+<div class="callout callout-warn">
+    <div class="callout-icon">⚠</div>
+    <div class="callout-body">
+        <p>留空则禁用该功能。多设备场景下<strong>每盏灯必须使用不同的按键组合</strong> —— 系统级 <code>RegisterHotKey</code> 是独占的，重复绑定会失败。快捷键在设置保存后立即生效。</p>
+    </div>
+</div>
+
+<h2 id="电源策略">电源策略</h2>
+
+<p>每盏灯在<strong>设备编辑器</strong>里都有独立的五个开关：</p>
+<ul>
+    <li><strong>灯跟随软件启动</strong> — 程序启动时自动开这盏灯</li>
+    <li><strong>灯跟随软件关闭</strong> — 程序退出（含托盘"退出"、<code>Ctrl+C</code>、任务栏关闭、Windows 关机）时自动关这盏灯</li>
+    <li><strong>灯随显示器休眠开关</strong> — 显示器休眠时关灯，唤醒时恢复休眠前状态</li>
+    <li><strong>系统休眠时关灯</strong> — 系统进入睡眠 / 休眠时关灯</li>
+    <li><strong>系统唤醒时开灯</strong> — 系统从睡眠 / 休眠恢复时开灯</li>
+</ul>
+
+<p>每盏灯<strong>互不干扰</strong>：可以让台灯跟随软件启停、显示器挂灯跟随显示器休眠、床头灯只用系统休眠 / 唤醒 —— 组合自由。</p>
+
+<h3>底层实现</h3>
+<ul>
+    <li>显示器休眠通过 <code>RegisterPowerSettingNotification</code> 订阅 <code>GUID_CONSOLE_DISPLAY_STATE</code>，跟随 Windows 自身的显示器电源广播，不做独立空闲计时（看视频、听音乐时不会误关）</li>
+    <li>系统休眠 / 唤醒监听 <code>WM_POWERBROADCAST</code> 的 <code>PBT_APMSUSPEND</code> / <code>PBT_APMRESUMESUSPEND</code></li>
+    <li>程序退出关灯走 <code>atexit</code> 钩子 + 顶级窗口的 <code>WM_QUERYENDSESSION</code> 双保险，覆盖 Windows 强制关机场景</li>
+</ul>
+
+<h3>拖滑杆自动开灯</h3>
+<p>当灯处于关闭状态时拖动亮度或色温滑杆，程序会<strong>先发送开灯指令，再设置目标值</strong>。默认行为、无需开关 —— 避免"拖了半天没反应"。</p>
+
+<h3>开机自启动</h3>
+<p>在托盘<strong>右键菜单</strong>或<strong>设备列表底部</strong>勾选"开机自启动"。本质是向 <code>HKCU\Software\Microsoft\Windows\CurrentVersion\Run</code> 写一条 <code>MiMonitorLightTray</code>，不需要管理员权限，只对当前用户生效。</p>
+
+<h2 id="桌面小部件">桌面小部件</h2>
+
+<p>右键托盘菜单点击 <strong>桌面小部件</strong> 即可在桌面显示一个常驻控制面板：</p>
+<ul>
+    <li><strong>拖动</strong>标题区域移动位置</li>
+    <li>右键小部件可 <strong>锁定 / 解锁</strong> 位置（锁定后无法拖动，防止误碰）</li>
+    <li>位置、锁定状态、可见性自动持久化到 <code>config.json</code> 的 <code>widget</code> 段</li>
+</ul>
+
+<div class="callout callout-warn">
+    <div class="callout-icon">⚠</div>
+    <div class="callout-body">
+        <p><strong>桌面小部件当前只显示配置里第一盏灯</strong>（老单设备实现，多设备扩展在计划中）。要控制其它灯请用托盘弹窗或快捷键。</p>
+    </div>
+</div>
+
+<h3>启用 MIoT（实验性）</h3>
+<p>设备编辑器里的开关。适合以下情况：手上是新型 Yeelight / MIoT 设备、不在 <code>_MIOT_MAPPINGS</code> 白名单里、又怀疑它实际走 MIoT 协议。勾选后程序会用 lamp22 的通用 Light service spec（<code>(siid=2, piid=1/2/3) = power/brightness/color-temperature</code>）尝试通信。设备不兼容时会持续报错；关掉即可回到 legacy 路径。</p>
+
+<h3>命令行参数</h3>
+<pre><code>MiMonitorLightTray.exe --setup    # 强制打开设备列表向导
+MiMonitorLightTray.exe --debug    # 开启调试日志</code></pre>
+
+<h2 id="配置文件">配置文件</h2>
+
+<p>位置：<code>%APPDATA%\MiMonitorLightTray\config.json</code></p>
+
+<pre><code>{
+  "devices": [
+    {
+      "id": "1a2b3c4d",
+      "ip": "192.168.1.100",
+      "token": "...32 位十六进制...",
+      "name": "显示器挂灯",
+      "model": "yeelink.light.lamp22",
+      "device_id": 12345678,
+      "enable_miot_for_unknown": false,
+      "power_on_at_startup": false,
+      "power_off_at_exit": false,
+      "power_off_on_monitor_sleep": false,
+      "power_off_on_system_suspend": false,
+      "power_on_on_system_resume": false,
+      "brightness_up": "Ctrl+Alt+Up",
+      "brightness_down": "Ctrl+Alt+Down",
+      "color_temp_up": "Ctrl+Alt+Right",
+      "color_temp_down": "Ctrl+Alt+Left",
+      "hotkey_step": 5,
+      "show_brightness": true,
+      "show_color_temp": true
+    }
+  ],
+  "widget": { "visible": false, "x": 100, "y": 100, "locked": true },
+  "auto_check_update": true
+}</code></pre>
+
+<h3>字段说明</h3>
+<ul>
+    <li><code>devices[]</code>：所有设备的数组。可以是空数组（此时启动会进设备列表向导）</li>
+    <li><code>devices[].id</code>：稳定标识符，新设备是 <code>temp_xxxxxxxx</code>，首次成功连接后自动升级为 <code>&lt;device_id 的 8 位十六进制&gt;</code></li>
+    <li><code>devices[].device_id</code>：首次连接时从 miio <code>info()</code> 捕获，用于 IP 变化后的自动发现</li>
+    <li><code>devices[].model</code>：留空时启动时通过 <code>info()</code> 自动探测并回填</li>
+    <li><code>devices[].enable_miot_for_unknown</code>：未在 <code>_MIOT_MAPPINGS</code> 白名单的 Yeelight 设备强制走 MIoT</li>
+    <li><code>power_*</code>：五个独立电源策略开关</li>
+    <li><code>brightness_up/down</code>、<code>color_temp_up/down</code>：本设备的四个全局快捷键</li>
+    <li><code>hotkey_step</code>：快捷键调整步进（亮度：加减 N，色温：按范围 N% 换算）</li>
+    <li><code>show_brightness</code> / <code>show_color_temp</code>：弹窗内此设备是否显示对应滑杆</li>
+    <li><code>widget</code>：桌面小部件位置 / 可见性 / 锁定状态</li>
+    <li><code>auto_check_update</code>：启动时是否自动检查 GitHub Release</li>
+</ul>
+
+<div class="callout callout-info">
+    <div class="callout-icon">↺</div>
+    <div class="callout-body">
+        <p><strong>v1.4 → v1.5 迁移</strong>：程序首次读取旧配置时会自动把顶层 <code>device</code> 单对象转成 <code>devices: [...]</code> 数组并生成 id，用户无需手工处理。</p>
+    </div>
+</div>
+
+<h2 id="兼容设备">兼容设备</h2>
+
+<p>本程序按设备 <code>model</code> <strong>自动选择 legacy 或 MIoT 协议</strong>。除少数手工 curated 的机型外，<strong>~2100 个 MIoT 灯具的协议映射与色温范围已从 <a href="https://home.miot-spec.com" target="_blank" rel="noopener">home.miot-spec.com</a> 抓取并嵌入</strong>，覆盖 yeelink、xiaomi、mijia 以及大量第三方品牌。</p>
+
+<h3>路由决策（按 model 优先级）</h3>
+<ol>
+    <li><strong>curated <code>_MIOT_MAPPINGS</code></strong>（含 lamp22）→ MIoT</li>
+    <li><strong>python-miio <code>YeelightSpecHelper</code></strong>（specs.yaml 已知的 legacy 设备，41 个）→ legacy</li>
+    <li><strong>本项目 curated <code>MODEL_CT_RANGES</code></strong>（手工验证过 legacy 的设备，如 lamp2）→ legacy</li>
+    <li><strong>bulk <code>_miot_data</code></strong>（前 3 个都没听说过的 MIoT-only 设备，~2100 个）→ MIoT</li>
+    <li><strong>完全未知</strong> → legacy（兜底，配合"启用 MIoT 实验性"开关可改走 MIoT）</li>
+</ol>
+
+<h3>重点机型</h3>
+<table>
+<thead><tr><th>型号 ID</th><th>设备</th><th>协议</th><th>色温范围</th></tr></thead>
+<tbody>
+<tr><td><code>yeelink.light.lamp22</code></td><td>米家智能显示器挂灯 1S（默认）</td><td>MIoT</td><td>2700–6500 K</td></tr>
+<tr><td><code>yeelink.light.lamp1</code></td><td>米家台灯</td><td>legacy</td><td>2700–5000 K</td></tr>
+<tr><td><code>yeelink.light.lamp2</code></td><td>米家台灯 Pro</td><td>legacy</td><td>2500–4800 K</td></tr>
+<tr><td><code>yeelink.light.lamp4</code></td><td>米家台灯 1S</td><td>legacy</td><td>2600–5000 K</td></tr>
+<tr><td><code>yeelink.light.ceiling*</code></td><td>米家智能吸顶灯</td><td>legacy</td><td>2700–6500 K</td></tr>
+<tr><td><code>yeelink.light.bslamp*</code></td><td>米家床头灯</td><td>legacy</td><td>1700–6500 K</td></tr>
+<tr><td>其它 ~2100 个 MIoT-only 机型</td><td>各品牌新型智能灯</td><td>MIoT</td><td>按 spec</td></tr>
+</tbody>
+</table>
+
+<div class="callout callout-info">
+    <div class="callout-icon">💬</div>
+    <div class="callout-body">
+        <p><strong>反馈兼容性问题时请带上 <code>model</code> 字段</strong>（例如 <code>yeelink.light.lamp22</code>）。可在配置文件 <code>%APPDATA%\MiMonitorLightTray\config.json</code> 的 <code>devices[].model</code> 看到，或用 <code>miiocli device --ip &lt;IP&gt; --token &lt;token&gt; info</code> 查。</p>
+    </div>
+</div>
+
+<h2 id="故障排除">故障排除</h2>
+
+<h3>从 v1.4.x 升级后设备没了 / 报错</h3>
+<p>程序会自动把旧的 <code>device</code> 字段迁移为 <code>devices</code> 数组。如果没有生效，检查 <code>%APPDATA%\MiMonitorLightTray\config.json</code> 是否可读；实在不行删掉重新走一遍设备列表向导。</p>
+
+<h3>多盏灯的快捷键冲突</h3>
+<p>系统级 <code>RegisterHotKey</code> 每个组合只能被注册一次，所以<strong>每盏灯必须用不同的快捷键</strong>。冲突时后注册的会失败并写入日志（<code>--debug</code> 可看到）。</p>
+
+<h3>提示"已在运行"</h3>
+<p>程序已启动，检查系统托盘溢出区（右下角向上箭头）是否有图标。</p>
+
+<h3>状态显示"离线 — Unable to discover the device"</h3>
+<ol>
+    <li>确认挂灯通电且与电脑在同一局域网</li>
+    <li>确认 IP 正确（用米家 App 或路由器复查）</li>
+    <li>miio 走 UDP 54321，部分企业网络 / 防火墙会拦截，可临时关闭防火墙测试</li>
+    <li>程序会在后台自动尝试发现新 IP（如果 <code>device_id</code> 已知）</li>
+</ol>
+
+<h3>提示"miio error: Invalid token"</h3>
+<p>Token 在设备重新配对到米家时会刷新，需用 cloud-tokens-extractor 重新提取，或者用云端导入功能重新拉一次。</p>
+
+<h3>托盘图标不显示</h3>
+<p>Windows 资源管理器可能把它收进了溢出区，点击托盘左侧的向上箭头查看。</p>
+
+<h3>拖滑杆时灯有约 0.1 秒延迟</h3>
+<p>这是有意的防抖（120ms 亮度 / 180ms 色温），用来合并请求避免设备被刷爆，松开手后会立即生效。每盏灯有独立防抖器，多设备不会互相拖累。</p>
+
+<h3>桌面小部件只显示一盏灯</h3>
+<p>小部件目前是旧的单设备实现，多设备场景请用托盘弹窗或快捷键。</p>
+
+<h2 id="从源码构建">从源码构建 EXE</h2>
+
+<pre><code>pip install -e ".[build]"
+python scripts/build_exe.py</code></pre>
+
+<p>输出到 <code>dist\MiMonitorLightTray.exe</code>。脚本会用 PyInstaller 的 <code>--onefile --noconsole</code>，并通过 <code>--collect-data miio</code> 把 python-miio 的 YAML / JSON 规格文件一起打包（否则会在运行时崩溃）。构建脚本开头会自动执行 <code>pip install -e . --no-deps --quiet</code> 同步 dist-info，确保 EXE 报告的版本号与 <code>pyproject.toml</code> 一致。</p>
+
+<h3>运行测试</h3>
+<pre><code>pip install -e ".[dev]"
+pytest -q</code></pre>
+
+<p>测试覆盖配置序列化、托盘图标渲染、miio 包装层与防抖器。UI 与真实网络路径需要手动验证。</p>
+
+</article>
+</div>
+</main>
+
+<footer>
+    <div class="footer-links">
+        <a href="https://github.com/Martlnez/MiMonitorLightTray" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Martlnez/MiMonitorLightTray/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://github.com/Martlnez/MiMonitorLightTray/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="index.html">首页</a>
+    </div>
+    <div>MIT License · Made for the Xiaomi / Yeelight ecosystem</div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>
+
+
