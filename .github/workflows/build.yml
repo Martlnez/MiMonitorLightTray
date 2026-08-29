@@ -61,10 +61,25 @@ jobs:
         with:
           name: MiMonitorLightTray-windows
           path: dist
+      - name: Pick release notes markdown if present
+        id: notes
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"  # e.g. "v1.5.1"
+          $path = "release-notes/RELEASE_NOTES_$tag.md"
+          $bodyFile = ""
+          if (Test-Path $path) {
+            $bodyFile = $path
+            Write-Output "body_path=$bodyFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            Write-Host "Using custom release notes: $bodyFile"
+          } else {
+            Write-Host "No custom notes at $path, using auto-generated ones."
+          }
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/MiMonitorLightTray.exe
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.body_path }}
+          generate_release_notes: ${{ steps.notes.outputs.body_path == '' }}
           draft: false
           prerelease: false
