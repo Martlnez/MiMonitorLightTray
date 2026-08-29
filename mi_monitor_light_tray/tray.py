@@ -133,9 +133,11 @@ class TrayController:
         menu_items.append(Menu.SEPARATOR)
         menu_items.append(MenuItem("退出", self._handle_exit))
 
+        # Start dim — the first state callback flips it bright if any lamp is on.
+        # Prevents a stale bright icon at boot before we know real state.
         self._icon = pystray.Icon(
             "mi-monitor-light-tray",
-            icon=make_tray_icon(64, on=True),
+            icon=make_tray_icon(64, on=False),
             title=self._title,
             menu=Menu(*menu_items),
         )

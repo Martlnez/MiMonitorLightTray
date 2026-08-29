@@ -88,20 +88,20 @@ class App:
         self._hotkey_manager = HotkeyManager()
         self._setup_hotkeys()
 
-        # Initialize monitor/system power listener
-        need_listener = any(
-            d.power_off_on_monitor_sleep or d.power_off_on_system_suspend or d.power_on_on_system_resume
-            for d in config.devices
-        )
+        # Initialize monitor/system power listener.
+        # NOTE: Always start the listener so we can refresh device state after
+        # resume / monitor wake, even if the user has not enabled any of the
+        # "auto power on/off" checkboxes. The callbacks themselves check the
+        # per-device flags before sending any control commands; they always
+        # send a refresh to bring cache/UI up to date.
         self._monitor_sleep_listener = MonitorSleepListener(
-            on_monitor_sleep=self._on_monitor_sleep if need_listener else None,
-            on_monitor_wake=self._on_monitor_wake if need_listener else None,
-            on_system_suspend=self._on_system_suspend if need_listener else None,
-            on_system_resume=self._on_system_resume if need_listener else None,
+            on_monitor_sleep=self._on_monitor_sleep,
+            on_monitor_wake=self._on_monitor_wake,
+            on_system_suspend=self._on_system_suspend,
+            on_system_resume=self._on_system_resume,
         )
-        if need_listener:
-            self._monitor_sleep_listener.start()
-            log.info("Power state listener started")
+        self._monitor_sleep_listener.start()
+        log.info("Power state listener started (always-on for refresh-on-wake)")
 
         # Track light state before monitor sleep for restoration (per-device)
         self._lights_state_before_sleep: dict[str, bool] = {}
@@ -175,20 +175,18 @@ class App:
         if devices_to_power_on:
             import threading
             threading.Thread(target=self._startup_power_on, daemon=True).start()
-        else:
-            # No power-on at startup, but still refresh devices without model/device_id
-            devices_need_refresh = [
-                d for d in self._config.devices
-                if d.is_complete() and (not d.model or d.device_id == 0)
-            ]
-            if devices_need_refresh:
-                import threading
-                def refresh_all():
-                    for dev_config in devices_need_refresh:
-                        light = self._lights.get(dev_config.id)
-                        if light:
-                            light.refresh()
-                threading.Thread(target=refresh_all, daemon=True).start()
+
+        # Always refresh every complete device in parallel so the tray icon
+        # settles to the real aggregate on/off state right after boot.
+        # Devices in the startup power-on set already get refreshed there.
+        power_on_ids = {d.id for d in devices_to_power_on}
+        import threading
+        for dev_config in self._config.devices:
+            if not dev_config.is_complete() or dev_config.id in power_on_ids:
+                continue
+            light = self._lights.get(dev_config.id)
+            if light:
+                threading.Thread(target=light.refresh, daemon=True).start()
         try:
             self._flyout.run()
         finally:
@@ -309,81 +307,121 @@ class App:
             self._config.devices[0].power_on_on_system_resume = not new_value
 
     def _restart_power_listener(self) -> None:
-        """Restart the monitor/system power listener with updated callbacks."""
+        """Restart the monitor/system power listener.
+
+        The listener is always-on (it drives resume/monitor-wake refreshes for
+        every device), so this does not depend on per-device power flags.
+        """
         if hasattr(self, '_monitor_sleep_listener'):
             self._monitor_sleep_listener.stop()
 
         from .monitor_sleep_listener import MonitorSleepListener
 
-        need_listener = any(
-            d.power_off_on_monitor_sleep or d.power_off_on_system_suspend or d.power_on_on_system_resume
-            for d in self._config.devices
-        )
-
         self._monitor_sleep_listener = MonitorSleepListener(
-            on_monitor_sleep=self._on_monitor_sleep if need_listener else None,
-            on_monitor_wake=self._on_monitor_wake if need_listener else None,
-            on_system_suspend=self._on_system_suspend if need_listener else None,
-            on_system_resume=self._on_system_resume if need_listener else None,
+            on_monitor_sleep=self._on_monitor_sleep,
+            on_monitor_wake=self._on_monitor_wake,
+            on_system_suspend=self._on_system_suspend,
+            on_system_resume=self._on_system_resume,
         )
 
-        if need_listener:
-            self._monitor_sleep_listener.start()
-            log.info("Power state listener restarted")
+        self._monitor_sleep_listener.start()
+        log.info("Power state listener restarted (always-on)")
 
     def _on_monitor_sleep(self) -> None:
-        """Called when monitor goes to sleep."""
-        log.info("Monitor sleep event - turning off lights")
-        # Save current light state per device
+        """Called when monitor goes to sleep (display off).
+
+        Only devices with power_off_on_monitor_sleep are turned off; other
+        devices are left alone (their cached state stays as-is and will be
+        refreshed on the next display-on event).
+        """
+        log.info("Monitor sleep event")
+        # Save current light state per device for restoration on wake
         self._lights_state_before_sleep = {}
+        import threading
         for dev_config in self._config.devices:
-            if not dev_config.power_off_on_monitor_sleep:
-                continue
             light = self._lights.get(dev_config.id)
             if not light:
                 continue
-            state = light.state
-            self._lights_state_before_sleep[dev_config.id] = state.is_on
-            # Turn off light if it's on
-            if state.is_on:
-                import threading
+            # Remember pre-sleep on/off for every device so wake can restore
+            # those that were turned off, and refresh everyone else.
+            self._lights_state_before_sleep[dev_config.id] = light.state.is_on
+            if not dev_config.power_off_on_monitor_sleep:
+                continue
+            # Turn off light if configured & reachable
+            if light.state.is_on:
                 threading.Thread(target=lambda l=light: l.set_power(False), daemon=True).start()
 
     def _on_monitor_wake(self) -> None:
-        """Called when monitor wakes up."""
-        log.info("Monitor wake event - restoring light state")
-        # Restore light state if it was on before sleep
+        """Called when monitor wakes up (display turns back on).
+
+        - Devices with power_off_on_monitor_sleep → restore prior on/off state.
+        - Every device → refresh in parallel so the flyout/tray don't keep
+          the stale "unreachable" / old cached values after a long display-off.
+        """
+        log.info("Monitor wake event - refreshing all devices")
+        import threading
         for dev_config in self._config.devices:
-            if not dev_config.power_off_on_monitor_sleep:
-                continue
             light = self._lights.get(dev_config.id)
             if not light:
                 continue
-            if self._lights_state_before_sleep.get(dev_config.id):
-                import threading
+            # Restore power state if this device is managed by monitor-sleep
+            # shutdown AND we actually turned it off before sleep.
+            if (dev_config.power_off_on_monitor_sleep
+                    and self._lights_state_before_sleep.get(dev_config.id)):
                 threading.Thread(target=lambda l=light: l.set_power(True), daemon=True).start()
+            else:
+                # Unmanaged / wasn't on before sleep → still refresh, because
+                # the UDP session to the lamp has likely expired during the
+                # idle display-off.
+                threading.Thread(target=light.refresh, daemon=True).start()
 
     def _on_system_suspend(self) -> None:
         """Called when system goes to sleep/hibernate."""
-        log.info("System suspend event - turning off lights")
+        log.info("System suspend event")
+        import threading
         for dev_config in self._config.devices:
             if not dev_config.power_off_on_system_suspend:
                 continue
             light = self._lights.get(dev_config.id)
             if light:
-                import threading
                 threading.Thread(target=lambda l=light: l.set_power(False), daemon=True).start()
 
     def _on_system_resume(self) -> None:
-        """Called when system resumes from sleep/hibernate."""
-        log.info("System resume event - turning on lights")
-        for dev_config in self._config.devices:
-            if not dev_config.power_on_on_system_resume:
-                continue
-            light = self._lights.get(dev_config.id)
-            if light:
-                import threading
-                threading.Thread(target=lambda l=light: l.set_power(True), daemon=True).start()
+        """Called when system resumes from sleep/hibernate.
+
+        Always refreshes every device. Two extra rounds are scheduled ~3s and
+        ~8s later because WiFi/docking station NICs frequently aren't fully
+        initialized when the OS fires the first resume broadcast; the
+        immediate refresh usually fails with "unreachable" on such setups.
+        """
+        log.info("System resume event - refreshing all devices (0s / +3s / +8s)")
+        import threading
+        import time
+
+        def _refresh_all_once(label: str) -> None:
+            log.debug("Resume refresh round: %s", label)
+            for dev_config in self._config.devices:
+                light = self._lights.get(dev_config.id)
+                if not light:
+                    continue
+                if dev_config.power_on_on_system_resume and label == "t+0s":
+                    # Only the immediate round sends power-on. The follow-up
+                    # rounds just refresh (user could have turned it off in
+                    # between and we don't want to override them).
+                    threading.Thread(target=lambda l=light: l.set_power(True), daemon=True).start()
+                else:
+                    threading.Thread(target=light.refresh, daemon=True).start()
+
+        # Immediate round (t + 0)
+        threading.Thread(target=lambda: _refresh_all_once("t+0s"), daemon=True).start()
+
+        # Two delayed rounds to cover late-initializing NICs / docks.
+        def _delayed(delay: float, label: str) -> None:
+            time.sleep(delay)
+            _refresh_all_once(label)
+
+        threading.Thread(target=lambda: _delayed(3.0, "t+3s"), daemon=True).start()
+        threading.Thread(target=lambda: _delayed(8.0, "t+8s"), daemon=True).start()
 
     def _toggle_auto_check_update(self) -> None:
         new_value = not self._config.auto_check_update

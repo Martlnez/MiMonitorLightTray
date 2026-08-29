@@ -160,15 +160,16 @@ class _DeviceSection:
         header.columnconfigure(1, weight=1)  # Status, fills remaining space
         header.columnconfigure(2, weight=0)  # Power button, fixed
 
-        # Truncate device name if too long (max 12 chars for Chinese, ~18 for ASCII mix)
+        # Truncate only when longer than a full brand name like
+        # "Mijia Computer Monitor Light Bar 2" (34 chars).
         display_name = device.name or "未命名设备"
-        if len(display_name) > 12:
-            display_name = display_name[:11] + "..."
+        if len(display_name) > 34:
+            display_name = display_name[:32] + "..."
 
         tk.Label(header, text=display_name,
                  fg=self.TEXT, bg=self.BG,
                  font=("Microsoft YaHei UI", 10, "bold"),
-                 anchor="w", width=13).grid(row=0, column=0, sticky="w")
+                 anchor="w").grid(row=0, column=0, sticky="w")
 
         self._status_var = tk.StringVar(value="")
         tk.Label(header, textvariable=self._status_var,
@@ -190,7 +191,12 @@ class _DeviceSection:
         self._color_temp_slider: Optional[_DarkSlider] = None
 
         if device.show_brightness:
-            self._brightness_var = tk.IntVar(value=50)
+            # Use cached state as initial value so the slider shows the last-known
+            # brightness immediately, before the background refresh corrects it.
+            cached_b = light.state.brightness or MiMonitorLight.BRIGHTNESS_MIN
+            cached_b = max(MiMonitorLight.BRIGHTNESS_MIN,
+                          min(MiMonitorLight.BRIGHTNESS_MAX, cached_b))
+            self._brightness_var = tk.IntVar(value=cached_b)
             self._brightness_slider = self._build_row(
                 "亮度",
                 self._brightness_var,
@@ -200,7 +206,11 @@ class _DeviceSection:
                 lambda v: self._on_brightness(device.id, int(float(v))))
 
         if device.show_color_temp:
-            self._color_temp_var = tk.IntVar(value=4000)
+            # Use cached state as initial value.
+            cached_ct = light.state.color_temp or 4000
+            cached_ct = max(light.color_temp_min,
+                           min(light.color_temp_max, cached_ct))
+            self._color_temp_var = tk.IntVar(value=cached_ct)
             self._color_temp_slider = self._build_row(
                 "色温",
                 self._color_temp_var,
@@ -255,11 +265,15 @@ class _DeviceSection:
         finally:
             self._suppress = False
 
+        # Always show cached is_on so users get an immediate answer; annotate
+        # unreachable state with "(离线)" instead of hiding the last-known status.
+        on_text = "已开灯" if state.is_on else "已关灯"
         if state.reachable:
-            self._status_var.set("已开灯" if state.is_on else "已关灯")
+            self._status_var.set(on_text)
+        elif state.error:
+            self._status_var.set(f"{on_text} (离线)")
         else:
-            err = (state.error or "")[:30]
-            self._status_var.set(f"离线 — {err}" if err else "离线")
+            self._status_var.set(on_text)
 
     def apply_ct_range(self, lo: int, hi: int) -> None:
         if self._color_temp_slider is None:
@@ -344,14 +358,18 @@ class FlyoutWindow:
         settings_btn.bind("<Enter>", lambda _e: settings_btn.configure(fg=self.TEXT))
         settings_btn.bind("<Leave>", lambda _e: settings_btn.configure(fg=self.MUTED))
 
-        # Power-off-all button (left of settings)
-        poweroff_all_btn = tk.Label(footer, text="⏻", fg=self.MUTED, bg=self.BG,
-                                    font=("Segoe UI Symbol", 14),
-                                    padx=6, cursor="hand2")
-        poweroff_all_btn.pack(side="right")
-        poweroff_all_btn.bind("<Button-1>", lambda _e: self._on_power_off_all())
-        poweroff_all_btn.bind("<Enter>", lambda _e: poweroff_all_btn.configure(fg=self.TEXT))
-        poweroff_all_btn.bind("<Leave>", lambda _e: poweroff_all_btn.configure(fg=self.MUTED))
+        # Toggle-all button (left of settings): bright when any light is on
+        # (click will turn everything off), muted when all are off (click
+        # turns everything on).
+        self._toggle_all_btn = tk.Label(footer, text="⏻", fg=self.MUTED, bg=self.BG,
+                                        font=("Segoe UI Symbol", 14),
+                                        padx=6, cursor="hand2")
+        self._toggle_all_btn.pack(side="right")
+        self._toggle_all_btn.bind("<Button-1>", lambda _e: self._on_toggle_all())
+        self._toggle_all_btn.bind("<Enter>",
+            lambda _e: self._toggle_all_btn.configure(fg=self.TEXT))
+        self._toggle_all_btn.bind("<Leave>",
+            lambda _e: self._toggle_all_btn.configure(fg=self._toggle_all_fg()))
 
     def _build_device_sections(self) -> None:
         """Build one section per device that has at least one control visible."""
@@ -421,7 +439,12 @@ class FlyoutWindow:
     def _open(self, x: int, y: int) -> None:
         # Rebuild in case device visibility settings changed
         self._build_device_sections()
-        threading.Thread(target=self._bg_refresh_all, daemon=True).start()
+        # Apply cached state synchronously first — user sees last-known values
+        # instantly. Then fan out refreshes in parallel to correct them.
+        for dev_id, light in self._lights.items():
+            if dev_id in self._sections:
+                self._apply_state(light.state, dev_id)
+        self._bg_refresh_all()
         self._position(x, y)
         self._root.deiconify()
         self._root.lift()
@@ -455,6 +478,7 @@ class FlyoutWindow:
         section = self._sections.get(device_id)
         if section:
             section.apply_state(state)
+        self._refresh_toggle_all_btn()
 
     def _apply_ct_range(self, device_id: str, lo: int, hi: int) -> None:
         section = self._sections.get(device_id)
@@ -462,11 +486,18 @@ class FlyoutWindow:
             section.apply_ct_range(lo, hi)
 
     def _bg_refresh_all(self) -> None:
+        # Fan out refreshes so a single slow/offline lamp doesn't block the
+        # others. Without this, opening the flyout after boot/wake can appear
+        # frozen while each device times out in turn.
         for dev_id, light in self._lights.items():
             if dev_id not in self._sections:
                 continue
-            state = light.refresh()
-            self._root.after(0, lambda s=state, d=dev_id: self._apply_state(s, d))
+            threading.Thread(target=self._refresh_one,
+                             args=(dev_id, light), daemon=True).start()
+
+    def _refresh_one(self, device_id: str, light: MiMonitorLight) -> None:
+        state = light.refresh()
+        self._root.after(0, lambda s=state, d=device_id: self._apply_state(s, d))
 
     def _on_brightness(self, device_id: str, val: int) -> None:
         light = self._lights.get(device_id)
@@ -492,18 +523,35 @@ class FlyoutWindow:
         state = light.state
         self._root.after(0, lambda: self._apply_state(state, device_id))
 
-    def _on_power_off_all(self) -> None:
-        """Turn off all reachable devices."""
-        threading.Thread(target=self._power_off_all_thread, daemon=True).start()
+    def _any_on(self) -> bool:
+        # Use cached is_on regardless of reachable — after boot/wake the cache
+        # may not yet be marked reachable but is_on still reflects the last
+        # known truth, and we want the button to act immediately.
+        return any(l.state.is_on for l in self._lights.values())
 
-    def _power_off_all_thread(self) -> None:
-        for light in self._lights.values():
-            if light.state.reachable:
-                light.set_power(False)
-        # Refresh all sections to show updated status
+    def _toggle_all_fg(self) -> str:
+        return self.TEXT if self._any_on() else self.MUTED
+
+    def _refresh_toggle_all_btn(self) -> None:
+        btn = getattr(self, "_toggle_all_btn", None)
+        if btn is not None:
+            btn.configure(fg=self._toggle_all_fg())
+
+    def _on_toggle_all(self) -> None:
+        """Toggle all devices: off if any are on, else on. Runs in parallel."""
+        target_on = not self._any_on()
+        # Send to every device, not just cached-reachable ones — a stale
+        # unreachable flag after wake should not silently swallow the click.
         for dev_id, light in self._lights.items():
-            state = light.state
-            self._root.after(0, lambda s=state, d=dev_id: self._apply_state(s, d))
+            threading.Thread(target=self._set_power_thread,
+                             args=(dev_id, light, target_on),
+                             daemon=True).start()
+
+    def _set_power_thread(self, device_id: str,
+                          light: MiMonitorLight, on: bool) -> None:
+        light.set_power(on)
+        state = light.state
+        self._root.after(0, lambda: self._apply_state(state, device_id))
 
     def _open_settings(self) -> None:
         self.hide()

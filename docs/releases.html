@@ -41,8 +41,46 @@
 
 <article class="release release-latest">
     <div class="release-header">
-        <h2>v1.5.0 · 多灯并行管理</h2>
+        <h2>v1.5.1 · 休眠恢复自动刷新 &amp; Flyout 体验优化</h2>
         <span class="release-tag">● 当前版本</span>
+    </div>
+    <p class="release-date">2026-08 发布</p>
+    <div class="release-body">
+        <p>集中修复 v1.5.0 上线后反馈最强烈的两类问题：<strong>电脑从休眠/显示器息屏恢复后，灯一直显示"离线"</strong>，以及弹窗（Flyout）打开时<strong>滑块跳变、刷新卡顿、总开关不好用</strong>。</p>
+
+        <h3>🐛 关键修复 · 恢复后永不离线</h3>
+        <ul>
+            <li><strong>电源事件监听器改为常驻</strong> — v1.5.0 里只有勾选了"息屏/休眠开关灯"才会启动监听窗口，三个都不勾的用户永远收不到 <code>PBT_APMRESUMEAUTOMATIC</code>，恢复后 UDP 会话过期 → 一直离线。v1.5.1 常驻监听，刷新无条件执行，开关灯按勾选决定</li>
+            <li><strong>系统唤醒 → 三轮补刀刷新（t+0s / +3s / +8s）</strong> — 覆盖 WiFi/扩展坞网卡平均 1~3s 才就绪的场景；只有第 0 秒会按"唤醒开灯"发 power-on，后面两轮只 refresh，不覆盖用户中途关的灯</li>
+            <li><strong>显示器点亮 → 刷新全部设备</strong> — 之前只对勾选了"息屏关灯"的设备做还原；现在所有设备并行 refresh，息屏期间用户用物理按钮改的参数也会同步回来</li>
+            <li>显示器息屏时 <strong>完整记录每台设备 pre-sleep 开关状态</strong>，不再只记录托管设备</li>
+        </ul>
+
+        <h3>✨ Flyout / 托盘 体验全面优化</h3>
+        <ul>
+            <li><strong>打开弹窗秒显缓存值 + 每设备独立线程并行刷新</strong> — 旧版串行逐个 refresh，一台离线卡死整列；新版先同步显示最后已知值，再后台并行校正，单台慢不阻塞</li>
+            <li><strong>亮度/色温滑块用缓存初始化</strong>（旧版硬编码 50 / 4000，肉眼可见先跳 50 再跳到真实值）</li>
+            <li><strong>离线状态保留最后已知开关信息</strong>：旧版直接显示「离线 — error」，新版显示 <code>已开灯 (离线)</code> / <code>已关灯 (离线)</code>，用户一眼看清真实状态</li>
+            <li><strong>底部 ⏻ 智能总开关</strong>：有灯亮 → 高亮（点=全关）；全灭 → 暗色（点=全开）。不再跳过 cached unreachable 的设备（修复"唤醒后按了没反应"）</li>
+            <li><strong>托盘图标启动时默认暗</strong>（旧版先亮 2~3 秒再闪暗，对用户造成"程序自动开了灯"的误解）</li>
+            <li><strong>设备名截断放宽到 34 字符</strong>，<code>Mijia Computer Monitor Light Bar 2</code> 这种官方长名完整显示，取消固定列宽</li>
+        </ul>
+
+        <h3>✨ 启动即并行刷新</h3>
+        <p>旧版只对缺 model / device_id 的设备 refresh，其余全是"默认离线"，托盘图标启动后长期是错的。新版启动后立刻并行刷新所有完整配置的设备，图标几秒内落到真实聚合态。</p>
+    </div>
+    <div class="release-actions">
+        <a class="btn btn-primary btn-sm" data-download href="https://github.com/Martlnez/MiMonitorLightTray/releases/latest" target="_blank" rel="noopener">下载 EXE</a>
+        <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/releases/tag/v1.5.1" target="_blank" rel="noopener">GitHub Release</a>
+        <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/compare/v1.5.0...v1.5.1" target="_blank" rel="noopener">Compare</a>
+        <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/blob/main/release-notes/RELEASE_NOTES_v1.5.1.md" target="_blank" rel="noopener">Markdown 原文</a>
+    </div>
+</article>
+
+<article class="release">
+    <div class="release-header">
+        <h2>v1.5.0 · 多灯并行管理</h2>
+        <span class="release-tag" style="background: var(--bg-tertiary); color: var(--text-muted);">2026-07</span>
     </div>
     <p class="release-date">2026-07 发布</p>
     <div class="release-body">
@@ -81,16 +119,8 @@
             <li>修正 <code>_on_config_saved</code> 保存后重建的灯回调签名（<code>(state)</code> → <code>(state, device_id)</code>）</li>
             <li>清理弹窗遗留的 <code>self._light</code> 引用，色温 clamp 时不再报 <code>AttributeError</code></li>
         </ul>
-
-        <h3>⚠️ 已知限制</h3>
-        <ul>
-            <li><strong>桌面小部件仍为单设备</strong> — 只显示配置里第一盏灯的滑杆，多设备场景请用托盘弹窗或快捷键</li>
-            <li>托盘右键菜单里的 5 个电源策略开关是"任一为真视为开"的聚合视图</li>
-            <li>顶层 <code>hotkey</code> 段被废弃，v1.5+ 使用每设备快捷键</li>
-        </ul>
     </div>
     <div class="release-actions">
-        <a class="btn btn-primary btn-sm" data-download href="https://github.com/Martlnez/MiMonitorLightTray/releases/latest" target="_blank" rel="noopener">下载 EXE</a>
         <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/releases/tag/v1.5.0" target="_blank" rel="noopener">GitHub Release</a>
         <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/compare/v1.4.3...v1.5.0" target="_blank" rel="noopener">Compare</a>
         <a class="btn btn-secondary btn-sm" href="https://github.com/Martlnez/MiMonitorLightTray/blob/main/release-notes/RELEASE_NOTES_v1.5.0.md" target="_blank" rel="noopener">Markdown 原文</a>
