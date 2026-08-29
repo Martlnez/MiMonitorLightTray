@@ -216,7 +216,20 @@ class MonitorSleepListener:
         self._ready.wait(timeout=2.0)
 
     def stop(self) -> None:
-        """Stop the listener thread."""
+        """Stop the listener thread and wait for it to fully exit.
+
+        Joining the window thread is critical: without it, ``stop()`` returns
+        the instant WM_CLOSE is posted, and the caller (e.g.
+        ``App._restart_power_listener``) will immediately spin up a *second*
+        listener. For a short window both top-level windows are alive and
+        subscribed to WM_POWERBROADCAST, so a display-off or suspend event
+        that arrives in that window fires ``on_monitor_sleep`` /
+        ``on_system_suspend`` *twice*. That double-fire can cause the saved
+        pre-sleep light state to be overwritten by the second call (which
+        observes the already-powered-off lamps), meaning ``on_monitor_wake``
+        then skips restoration and the light stays off when the user expects
+        it back on.
+        """
         self._stop_event.set()
         if self._hwnd:
             try:
@@ -231,6 +244,18 @@ class MonitorSleepListener:
                 user32.PostMessageW(self._hwnd, WM_CLOSE, 0, 0)
             except Exception:  # noqa: BLE001
                 log.debug("PostMessage(WM_CLOSE) failed", exc_info=True)
+
+        # Give the window thread a generous window to drain its message loop,
+        # unregister notifications, and release the window class / HWND.
+        # Bounded so a hung message-pump on a misconfigured system can never
+        # deadlock the caller.
+        if self._window_thread is not None and self._window_thread.is_alive():
+            self._window_thread.join(timeout=3.0)
+            if self._window_thread.is_alive():
+                log.warning(
+                    "Power listener window thread did not exit within 3s; "
+                    "restarting anyway (duplicate broadcasts are possible)."
+                )
 
     def _fire_monitor_sleep(self) -> None:
         if self._display_on:

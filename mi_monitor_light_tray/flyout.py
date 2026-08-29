@@ -441,7 +441,10 @@ class FlyoutWindow:
         self._build_device_sections()
         # Apply cached state synchronously first — user sees last-known values
         # instantly. Then fan out refreshes in parallel to correct them.
-        for dev_id, light in self._lights.items():
+        # NOTE: list() snapshot — App._on_model_resolved may re-key the dict
+        # concurrently from a refresh worker, and iterating a live dict view
+        # raises RuntimeError when its size changes mid-iteration.
+        for dev_id, light in list(self._lights.items()):
             if dev_id in self._sections:
                 self._apply_state(light.state, dev_id)
         self._bg_refresh_all()
@@ -489,7 +492,8 @@ class FlyoutWindow:
         # Fan out refreshes so a single slow/offline lamp doesn't block the
         # others. Without this, opening the flyout after boot/wake can appear
         # frozen while each device times out in turn.
-        for dev_id, light in self._lights.items():
+        # list() snapshot: see _open — _lights dict can be re-keyed concurrently.
+        for dev_id, light in list(self._lights.items()):
             if dev_id not in self._sections:
                 continue
             threading.Thread(target=self._refresh_one,
@@ -527,7 +531,10 @@ class FlyoutWindow:
         # Use cached is_on regardless of reachable — after boot/wake the cache
         # may not yet be marked reachable but is_on still reflects the last
         # known truth, and we want the button to act immediately.
-        return any(l.state.is_on for l in self._lights.values())
+        # list() snapshot: _lights dict can be re-keyed concurrently from a
+        # refresh worker (on_model_resolved callback); live view iteration
+        # raises RuntimeError if the dict is mutated between yields.
+        return any(l.state.is_on for l in list(self._lights.values()))
 
     def _toggle_all_fg(self) -> str:
         return self.TEXT if self._any_on() else self.MUTED
@@ -542,7 +549,9 @@ class FlyoutWindow:
         target_on = not self._any_on()
         # Send to every device, not just cached-reachable ones — a stale
         # unreachable flag after wake should not silently swallow the click.
-        for dev_id, light in self._lights.items():
+        # list() snapshot: see _open — _lights dict can be re-keyed concurrently
+        # from a refresh worker (on_model_resolved callback).
+        for dev_id, light in list(self._lights.items()):
             threading.Thread(target=self._set_power_thread,
                              args=(dev_id, light, target_on),
                              daemon=True).start()

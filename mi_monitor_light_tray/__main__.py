@@ -442,8 +442,14 @@ class App:
         # Called from worker threads — marshal to Tk thread.
         self._flyout.schedule_apply_state(state, device_id)
 
-        # Update tray with aggregate status
-        any_on = any(l.state.is_on for l in self._lights.values() if l.state.reachable)
+        # Update tray with aggregate status.
+        # list() snapshot: _on_model_resolved re-keys self._lights concurrently
+        # (pop + insert) from a refresh worker; iterating the live dict view
+        # raises RuntimeError("dictionary changed size during iteration") when
+        # that mutation lands between iterator yields.
+        any_on = any(
+            l.state.is_on for l in list(self._lights.values()) if l.state.reachable
+        )
         self._tray.set_state(any_on)
 
     def _on_ip_changed(self, device_id: str, new_ip: str) -> None:
