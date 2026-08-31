@@ -439,17 +439,37 @@ class App:
         self._flyout.schedule_open(x, y)
 
     def _on_state_changed(self, state: "LightState", device_id: str) -> None:
-        # Called from worker threads — marshal to Tk thread.
+    # Called from worker threads — marshal to Tk thread.
         self._flyout.schedule_apply_state(state, device_id)
 
-        # Update tray with aggregate status.
-        # list() snapshot: _on_model_resolved re-keys self._lights concurrently
-        # (pop + insert) from a refresh worker; iterating the live dict view
-        # raises RuntimeError("dictionary changed size during iteration") when
-        # that mutation lands between iterator yields.
-        any_on = any(
-            l.state.is_on for l in list(self._lights.values()) if l.state.reachable
-        )
+    # Update tray with aggregate status.
+    # list() snapshot: _on_model_resolved re-keys self._lights concurrently
+    # (pop + insert) from a refresh worker; iterating the live dict view
+    # raises RuntimeError("dictionary changed size during iteration") when
+    # that mutation lands between iterator yields.
+    #
+    # NOTE: intentionally do NOT filter by l.state.reachable here — this
+    # deliberately mirrors the semantics of FlyoutWindow._any_on(), whose
+    # comment block explains the rationale:
+    #
+    #   "after boot/wake the cache may not yet be marked reachable but is_on
+    #    still reflects the last known truth"
+    #
+    # Filtering by reachable used to cause a very visible bug: when ALL lamps
+    # were powered on simultaneously (cold boot with power_on_at_startup,
+    # system resume / monitor wake, or the "toggle all on" action), the
+    # concurrent refresh() threads would each transiently write
+    # reachable=False on the first UDP timeout (WiFi / dock NICs are often
+    # not up yet on the first resume broadcast, which is exactly why
+    # _on_system_resume runs three staggered rounds at +0s/+3s/+8s).
+    # With the reachable gate in place, those transient False values would
+    # exclude EVERY device from the any() check — all lamps physically on
+    # but the tray icon stubbornly stayed dim, while the flyout footer
+    # toggle button correctly rendered bright (it doesn't filter by
+    # reachable).  Removing the filter keeps tray <-> flyout visually
+    # consistent and matches user expectation ("I turned all lights on;
+    # the icon should show on").
+        any_on = any(l.state.is_on for l in list(self._lights.values()))
         self._tray.set_state(any_on)
 
     def _on_ip_changed(self, device_id: str, new_ip: str) -> None:
