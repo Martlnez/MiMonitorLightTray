@@ -59,12 +59,12 @@ If your model is in none of the sources → the app falls back to legacy. For MI
 
 ### Option 1: pre-built binary (recommended)
 
-Grab `MiMonitorLightTray.exe` from [Releases](https://github.com/Martlnez/MiMonitorLightTray/releases). Every push to `main` and every tag triggers a CI build (see [build.yml](.github/workflows/build.yml)).
+Grab `MiMonitorLightTray.exe` from [Releases](https://github.com/awakaze/MiMonitorLightTray/releases). Every push to `main` and every tag triggers a CI build (see [build.yml](.github/workflows/build.yml)).
 
 ### Option 2: run from source
 
 ```bash
-git clone https://github.com/Martlnez/MiMonitorLightTray.git
+git clone https://github.com/awakaze/MiMonitorLightTray.git
 cd MiMonitorLightTray
 
 python -m venv .venv
@@ -248,7 +248,7 @@ That's intentional debouncing (120 ms brightness / 180 ms color temperature) to 
 
 ## Acknowledgements
 
-- [@zengzoxiong](https://github.com/zengzoxiong) — cloud Token extractor and desktop widget ([PR #1](https://github.com/Martlnez/MiMonitorLightTray/pull/1))
+- [@zengzoxiong](https://github.com/zengzoxiong) — cloud Token extractor and desktop widget ([PR #1](https://github.com/awakaze/MiMonitorLightTray/pull/1))
 - [python-miio](https://github.com/rytilahti/python-miio) — the protocol library
 - [pystray](https://github.com/moses-palmer/pystray) — Python system-tray glue
 - [Pillow](https://python-pillow.org/) — icon rendering

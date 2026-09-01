@@ -570,12 +570,12 @@ class DeviceListWizard:
             self._on_check_update_cb()
         else:
             import webbrowser
-            webbrowser.open("https://github.com/Martlnez/MiMonitorLightTray/releases/latest")
+            webbrowser.open("https://github.com/awakaze/MiMonitorLightTray/releases/latest")
 
     def _on_open_github(self) -> None:
         """Open GitHub repository."""
         import webbrowser
-        webbrowser.open("https://github.com/Martlnez/MiMonitorLightTray")
+        webbrowser.open("https://github.com/awakaze/MiMonitorLightTray")
 
     def _close(self) -> None:
         """Close the wizard."""

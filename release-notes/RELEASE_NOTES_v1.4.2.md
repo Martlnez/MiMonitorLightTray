@@ -6,6 +6,6 @@
 
 ---
 
-感谢所有反馈和建议！如有问题请在 [Issues](https://github.com/Martlnez/MiMonitorLightTray/issues) 提出。
+感谢所有反馈和建议！如有问题请在 [Issues](https://github.com/awakaze/MiMonitorLightTray/issues) 提出。
 
-**Full Changelog**: https://github.com/Martlnez/MiMonitorLightTray/compare/v1.4.1...v1.4.2
+**Full Changelog**: https://github.com/awakaze/MiMonitorLightTray/compare/v1.4.1...v1.4.2

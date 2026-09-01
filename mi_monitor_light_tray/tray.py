@@ -355,7 +355,7 @@ class TrayController:
     def _handle_open_github(self, _icon, _item) -> None:
         """Open GitHub repository in browser."""
         import webbrowser
-        url = "https://github.com/Martlnez/MiMonitorLightTray"
+        url = "https://github.com/awakaze/MiMonitorLightTray"
         webbrowser.open(url)
         log.info("Opened GitHub: %s", url)
 

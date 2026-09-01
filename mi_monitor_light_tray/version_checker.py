@@ -92,7 +92,7 @@ def parse_version(version_str: str) -> Tuple[int, ...]:
 
 
 def check_for_updates(
-    repo: str = "Martlnez/MiMonitorLightTray",
+    repo: str = "awakaze/MiMonitorLightTray",
     timeout: int = 5
 ) -> Optional[dict]:
     """Check GitHub Releases for newer versions.
@@ -169,7 +169,7 @@ def _extract_exe_url(release_data: dict) -> Optional[str]:
 class VersionChecker:
     """Background version checker that runs on a separate thread."""
 
-    def __init__(self, repo: str = "Martlnez/MiMonitorLightTray"):
+    def __init__(self, repo: str = "awakaze/MiMonitorLightTray"):
         self.repo = repo
         self._update_info: Optional[dict] = None
         self._checked = False

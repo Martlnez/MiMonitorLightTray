@@ -93,4 +93,4 @@ v1.5.1：**显示器从 off → on 的一次广播会对所有设备并行 refre
 
 ## 对比
 
-[v1.5.0 → v1.5.1 完整变更](https://github.com/Martlnez/MiMonitorLightTray/compare/v1.5.0...v1.5.1)
+[v1.5.0 → v1.5.1 完整变更](https://github.com/awakaze/MiMonitorLightTray/compare/v1.5.0...v1.5.1)

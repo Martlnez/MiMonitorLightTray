@@ -1,6 +1,6 @@
 # 小米显示器挂灯托盘控制器
 
-> English version: **[README_EN.md](README_EN.md)** · 在线文档：**[Martlnez.github.io/MiMonitorLightTray](https://martlnez.github.io/MiMonitorLightTray/)**
+> English version: **[README_EN.md](README_EN.md)** · 在线文档：**[awakaze.github.io/MiMonitorLightTray](https://awakaze.github.io/MiMonitorLightTray/)**
 
 一款 Windows 系统托盘小工具，用类似 [Twinkle Tray](https://twinkletray.com/) 的弹出式滑杆，控制小米 / Yeelight 显示器挂灯及各类米家灯具的开关、亮度与色温。基于 [python-miio](https://github.com/rytilahti/python-miio) 与设备本地局域网通信，**不经过云端**。
 
@@ -67,12 +67,12 @@
 
 ### 方式一：下载预编译版本（推荐）
 
-从 [Releases](https://github.com/Martlnez/MiMonitorLightTray/releases) 下载 `MiMonitorLightTray.exe`，双击运行即可。每次 push 到 `main` 与每个 tag 都会自动构建（见 [build.yml](.github/workflows/build.yml)）。
+从 [Releases](https://github.com/awakaze/MiMonitorLightTray/releases) 下载 `MiMonitorLightTray.exe`，双击运行即可。每次 push 到 `main` 与每个 tag 都会自动构建（见 [build.yml](.github/workflows/build.yml)）。
 
 ### 方式二：从源码运行
 
 ```bash
-git clone https://github.com/Martlnez/MiMonitorLightTray.git
+git clone https://github.com/awakaze/MiMonitorLightTray.git
 cd MiMonitorLightTray
 
 python -m venv .venv
@@ -234,7 +234,7 @@ pytest -q
 - [docs/releases.html](docs/releases.html) — 版本发布说明
 - [docs/assets/](docs/assets/) — CSS / JS / 图标
 
-**首次启用**：Repo → Settings → Pages → Source 选 `Deploy from a branch`，Branch 选 `main` / `/docs`，保存后几十秒内 `https://martlnez.github.io/MiMonitorLightTray/` 就能访问。
+**首次启用**：Repo → Settings → Pages → Source 选 `Deploy from a branch`，Branch 选 `main` / `/docs`，保存后几十秒内 `https://awakaze.github.io/MiMonitorLightTray/` 就能访问。
 
 页面顶部下载按钮和版本号会通过 GitHub Releases API 自动填入最新版本，push 后不用手工同步版本号。
 
@@ -364,7 +364,7 @@ A：小部件目前是旧的单设备实现，多设备场景请用托盘弹窗�
 
 ## 致谢
 
-- [@zengzoxiong](https://github.com/zengzoxiong) — 云端 Token 提取与桌面小部件功能（[PR #1](https://github.com/Martlnez/MiMonitorLightTray/pull/1)）
+- [@zengzoxiong](https://github.com/zengzoxiong) — 云端 Token 提取与桌面小部件功能（[PR #1](https://github.com/awakaze/MiMonitorLightTray/pull/1)）
 - [python-miio](https://github.com/rytilahti/python-miio) — miio 协议库
 - [pystray](https://github.com/moses-palmer/pystray) — Python 系统托盘
 - [Pillow](https://python-pillow.org/) — 图标生成

@@ -1,6 +1,6 @@
 /* Mi Monitor Light Tray — GitHub Pages 交互脚本 */
 
-const REPO = 'Martlnez/MiMonitorLightTray';
+const REPO = 'awakaze/MiMonitorLightTray';
 const API_LATEST = `https://api.github.com/repos/${REPO}/releases/latest`;
 const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
 
